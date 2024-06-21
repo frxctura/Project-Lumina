@@ -1,6 +1,6 @@
 # Project Lumina
 
-![Project Lumina Banner](https://raw.githubusercontent.com/frxctura/Project-Lumina/main/repo/ProjectLumina.png)
+![Project Lumina Banner](https://raw.githubusercontent.com/frxctura/Project-Lumina/main/repo/ProjectLuminaBanner.png)
 
 Project Lumina is a JavaFX-based cracking tool designed to automate the process of cracking games. Developed solely by me, this tool provides a seamless interface for selecting game directories, managing backups, and applying cracks using the Goldberg Steam Emu.
 

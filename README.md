@@ -14,7 +14,7 @@ Project Lumina is a JavaFX-based cracking tool designed to automate the process 
 ## Roadmap
 - **Display Game Information**: Integrate features to display game information if possible.
 - **Move Game Folder After Cracking**: Implement functionality to move the game folder post-cracking. [DONE]
-- **Backup Entire Game Directory**: Extend backup capabilities to include the entire game directory, not just DLL files.
+- **Backup Entire Game Directory**: Extend backup capabilities to include the entire game directory, not just DLL files. [DONE]
 - **Switch Goldberg Versions**: Allow users to switch between old and newer Goldberg versions, including newly maintained forks.
 - **Switch Emulators**: Allow users to select specific emulators for the game.
 

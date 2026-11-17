@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<ScrollPane fitToWidth="true" hbarPolicy="NEVER" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.javafxapp.javafxapp.ui.pages.SettingsController">
+    <VBox fx:id="settingsContainer" styleClass="page">
+        <Label styleClass="title" text="Settings"/>
+
+        <VBox styleClass="card">
+            <Label styleClass="section-label" text="APPEARANCE"/>
+            <HBox styleClass="toolbar">
+                <HBox styleClass="segmented">
+                    <ToggleButton fx:id="themeDark" styleClass="segment, first" text="DARK"/>
+                    <ToggleButton fx:id="themeLight" styleClass="segment" text="LIGHT"/>
+                    <ToggleButton fx:id="themeSystem" styleClass="segment, last" text="SYSTEM"/>
+                </HBox>
+                <Label fx:id="themeHint" styleClass="path-label"/>
+            </HBox>
+        </VBox>
+
+        <VBox styleClass="card">
+            <VBox styleClass="stack">
+                <Label styleClass="section-label" text="BACKUP &amp; MOVE"/>
+                <Label styleClass="path-label" wrapText="true" minHeight="-Infinity"
+                       text="Original DLLs are kept as .bak files next to themselves (toggle on Home). Optionally copy the whole game somewhere safe first, or move it once it's patched."/>
+            </VBox>
+            <GridPane styleClass="form-grid">
+                <columnConstraints>
+                    <ColumnConstraints minWidth="260.0"/>
+                    <ColumnConstraints hgrow="ALWAYS"/>
+                </columnConstraints>
+                <CheckBox fx:id="backupGameDirCheckbox" styleClass="app-check"
+                          text="Copy entire game folder first" GridPane.rowIndex="0"/>
+                <HBox styleClass="toolbar" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                    <Button fx:id="selectBackupDir" styleClass="secondary-button" text="BROWSE"/>
+                    <Button fx:id="openBackupDir" styleClass="secondary-button" text="OPEN"/>
+                    <Label fx:id="backupDirLabel" styleClass="path-label" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+                </HBox>
+                <CheckBox fx:id="moveGameDirCheckbox" styleClass="app-check"
+                          text="Move game folder afterwards" GridPane.rowIndex="1"/>
+                <HBox styleClass="toolbar" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                    <Button fx:id="selectMoveDir" styleClass="secondary-button" text="BROWSE"/>
+                    <Button fx:id="openMoveDir" styleClass="secondary-button" text="OPEN"/>
+                    <Label fx:id="moveDirLabel" styleClass="path-label" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
+                </HBox>
+            </GridPane>
+            <CheckBox fx:id="previewCheckbox" styleClass="app-check"
+                      text="Show what will change before patching"/>
+        </VBox>
+
+        <VBox styleClass="card">
+            <Label styleClass="section-label" text="EMULATORS"/>
+            <VBox fx:id="emulatorList" styleClass="gap-2"/>
+            <HBox styleClass="toolbar">
+                <Button fx:id="excludeEmulatorsButton" styleClass="secondary-button" text="EXCLUDE FROM DEFENDER"/>
+                <Label styleClass="path-label" wrapText="true" HBox.hgrow="ALWAYS" maxWidth="Infinity"
+                       text="Stops Microsoft Defender from quarantining the emulator DLLs Lumina keeps. Needs administrator permission."/>
+            </HBox>
+        </VBox>
+
+        <VBox styleClass="card">
+            <Label styleClass="section-label" text="APP DATA &amp; LOGGING"/>
+            <HBox styleClass="toolbar">
+                <Label styleClass="field-label" text="Stored in"/>
+                <Label fx:id="appDataLabel" styleClass="path-label"/>
+                <Button fx:id="openAppData" styleClass="secondary-button" text="OPEN"/>
+            </HBox>
+            <HBox styleClass="gap-4" alignment="CENTER_LEFT">
+                <CheckBox fx:id="logToFileCheckbox" styleClass="app-check" text="Write activity to a log file"/>
+                <HBox styleClass="toolbar">
+                    <Button fx:id="openLogsButton" styleClass="secondary-button" text="OPEN LOGS"/>
+                    <Button fx:id="clearRecentButton" styleClass="secondary-button" text="CLEAR RECENT GAMES"/>
+                </HBox>
+            </HBox>
+        </VBox>
+
+        <HBox styleClass="toolbar">
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="resetSettings" styleClass="secondary-button, danger-text" text="RESET SETTINGS"/>
+        </HBox>
+    </VBox>
+</ScrollPane>

@@ -1,0 +1,58 @@
+/* dialogs. loaded after styles.css, uses its palette tokens.
+   layout follows the windows dialog guidance: 24px padding, 12px between blocks,
+   left-aligned text, buttons in a footer band, 8px between them */
+.dialog-pane.lumina-alert {
+    -fx-background-color: -surface;
+    -fx-background-radius: 10;
+    -fx-border-radius: 10;
+    -fx-border-color: -border-strong;
+    -fx-padding: 0;
+}
+
+.lumina-alert .prompt { -fx-padding: 24; }
+
+.prompt-title   { -fx-font-family: "Nunito Black"; -fx-font-size: 18px; -fx-text-fill: -text; }
+.prompt-message { -fx-font-size: 14px; -fx-text-fill: -text; -fx-line-spacing: 2; }
+.prompt-note    { -fx-font-size: 12px; -fx-text-fill: -text-dim; }
+.prompt-result  { -fx-font-size: 13px; -fx-text-fill: -text-dim; }
+
+.prompt-list {
+    -fx-background-color: -surface-2;
+    -fx-background-radius: 6;
+    -fx-border-color: -border;
+    -fx-border-radius: 6;
+    -fx-padding: 10 12;
+}
+.prompt-list-line { -fx-font-size: 13px; -fx-text-fill: -text-dim; }
+.prompt-list-scroll, .prompt-list-scroll > .viewport { -fx-background-color: transparent; -fx-background-insets: 0; -fx-padding: 0; }
+
+.lumina-alert .check-box { -fx-text-fill: -text; }
+
+/* the command area: a band of its own at the bottom */
+.lumina-alert > .button-bar {
+    -fx-background-color: -bg;
+    -fx-background-radius: 0 0 10 10;
+    -fx-border-color: -border;
+    -fx-border-width: 1 0 0 0;
+    -fx-padding: 20 24 20 24;
+}
+.lumina-alert .button-bar .container { -fx-spacing: 8; }
+
+.lumina-alert .button {
+    -fx-background-color: -control;
+    -fx-text-fill: -text;
+    -fx-min-height: 36; -fx-pref-height: 36;
+    -fx-padding: 0 16;
+    -fx-font-size: 12px;
+    -fx-font-family: "Nunito Black";
+    -fx-background-radius: 6;
+    -fx-background-insets: 0;
+    -fx-cursor: hand;
+}
+.lumina-alert .button:hover   { -fx-background-color: -control-hover; }
+.lumina-alert .button:pressed { -fx-background-color: -control-pressed; }
+.lumina-alert .button:default { -fx-background-color: -accent; -fx-text-fill: -on-accent; }
+.lumina-alert .button:default:hover { -fx-background-color: -accent-hover; }
+.lumina-alert .button:default.destructive       { -fx-background-color: -danger-fill; -fx-text-fill: white; }
+.lumina-alert .button:default.destructive:hover { -fx-background-color: -danger-fill-hover; }
+.lumina-alert .button:disabled { -fx-opacity: 0.4; }

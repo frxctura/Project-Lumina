@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import com.javafxapp.javafxapp.ui.components.StepIndicator?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.*?>
+
+<HBox fx:id="root" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.javafxapp.javafxapp.ui.pages.MainController">
+
+    <StackPane HBox.hgrow="ALWAYS">
+        <VBox fx:id="selectView" alignment="CENTER" styleClass="page">
+            <VBox fx:id="dropZone" styleClass="drop-zone" maxWidth="480">
+                <Label styleClass="drop-icon" text="⇩"/>
+                <VBox alignment="CENTER" styleClass="stack">
+                    <Label styleClass="title" text="Drop a game folder here"/>
+                    <Label styleClass="muted" text="or pick one manually"/>
+                </VBox>
+                <Button fx:id="selectDirButton" prefWidth="240.0" styleClass="primary-button, accent" text="SELECT DIRECTORY"/>
+            </VBox>
+            <VBox fx:id="recentBox" styleClass="gap-2" maxWidth="480">
+                <Label styleClass="section-label" text="RECENT"/>
+                <VBox fx:id="recentList" styleClass="gap-2"/>
+            </VBox>
+        </VBox>
+
+        <VBox fx:id="readyView" styleClass="page, ready-view">
+            <HBox styleClass="toolbar">
+                <Label fx:id="readyTitle" styleClass="title"/>
+                <Label fx:id="patchBadge" styleClass="badge" minWidth="-Infinity" visible="false"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="changeDirButton" styleClass="secondary-button" text="CHANGE"/>
+            </HBox>
+
+            <HBox styleClass="gap-4" alignment="CENTER_LEFT">
+                <HBox styleClass="field-group">
+                    <Label styleClass="field-label" text="Emulator"/>
+                    <ComboBox fx:id="emulatorBox" prefWidth="130.0"/>
+                    <Button fx:id="emulatorSettingsButton" styleClass="secondary-button, icon-button" text="⚙" mnemonicParsing="false"/>
+                </HBox>
+                <HBox styleClass="field-group">
+                    <Label styleClass="field-label" text="Steam App ID"/>
+                    <TextField fx:id="appIdField" prefWidth="110.0" promptText="optional"/>
+                </HBox>
+            </HBox>
+            <CheckBox fx:id="backupCheckBox" mnemonicParsing="false" styleClass="app-check" text="Back up original steam_api DLLs (.bak)"/>
+
+            <VBox fx:id="progressBox" styleClass="progress-box">
+                <StepIndicator fx:id="steps"/>
+                <HBox styleClass="toolbar">
+                    <ProgressBar fx:id="progressBar" maxWidth="Infinity" HBox.hgrow="ALWAYS" progress="0"/>
+                    <Label fx:id="percentLabel" styleClass="percent-label"/>
+                </HBox>
+                <Label fx:id="progressDetail" styleClass="progress-detail"/>
+            </VBox>
+
+            <ListView fx:id="logList" styleClass="log-list" VBox.vgrow="ALWAYS" focusTraversable="false"/>
+
+            <HBox styleClass="toolbar">
+                <Button fx:id="backButton" styleClass="secondary-button" text="BACK"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="restoreButton" styleClass="secondary-button" text="RESTORE ORIGINALS"/>
+                <Button fx:id="openFolderButton" styleClass="secondary-button" text="OPEN FOLDER"/>
+                <Button fx:id="crackButton" prefWidth="180.0" styleClass="primary-button, accent" text="START CRACKING"/>
+            </HBox>
+        </VBox>
+    </StackPane>
+
+    <VBox prefWidth="268.0" minWidth="268.0" styleClass="side-panel, info-panel">
+        <Label maxWidth="Infinity" alignment="CENTER" styleClass="heading" text="Game information"/>
+        <Separator/>
+        <VBox alignment="CENTER" styleClass="gap-2">
+            <ImageView fx:id="coverIcon" fitHeight="56.0" fitWidth="56.0" preserveRatio="true">
+                <Image url="@../images/icon.png"/>
+            </ImageView>
+            <ImageView fx:id="coverHeader" fitWidth="220.0" preserveRatio="true" smooth="true" styleClass="cover"/>
+            <Label fx:id="gameName" alignment="CENTER" maxWidth="Infinity" styleClass="game-name" wrapText="true"/>
+        </VBox>
+        <GridPane styleClass="kv-grid">
+            <columnConstraints>
+                <ColumnConstraints minWidth="72.0"/>
+                <ColumnConstraints hgrow="ALWAYS"/>
+            </columnConstraints>
+            <Label styleClass="info-key" text="Size" GridPane.rowIndex="0"/>
+            <Label fx:id="gameSize" styleClass="info-value" GridPane.rowIndex="0" GridPane.columnIndex="1"/>
+            <Label styleClass="info-key" text="Files" GridPane.rowIndex="1"/>
+            <Label fx:id="fileCount" styleClass="info-value" GridPane.rowIndex="1" GridPane.columnIndex="1"/>
+            <Label styleClass="info-key" text="Steam API" GridPane.rowIndex="2" GridPane.valignment="TOP"/>
+            <Label fx:id="dllCount" styleClass="info-value" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
+            <Label styleClass="info-key" text="Executable" GridPane.rowIndex="3"/>
+            <Label fx:id="gameExecutable" styleClass="info-value" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
+            <Label styleClass="info-key" text="Modified" GridPane.rowIndex="4"/>
+            <Label fx:id="lastModified" styleClass="info-value" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+            <Label styleClass="info-key" text="Backups" GridPane.rowIndex="5" GridPane.valignment="TOP"/>
+            <VBox styleClass="stack" GridPane.rowIndex="5" GridPane.columnIndex="1">
+                <Label fx:id="backupInfo" styleClass="info-value" wrapText="true"/>
+                <Hyperlink fx:id="backupLink" styleClass="inline-link"/>
+            </VBox>
+            <Label styleClass="info-key" text="Path" GridPane.rowIndex="6" GridPane.valignment="TOP"/>
+            <Label fx:id="gamePath" styleClass="info-value, muted" wrapText="true" maxHeight="48"
+                   GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+        </GridPane>
+    </VBox>
+</HBox>

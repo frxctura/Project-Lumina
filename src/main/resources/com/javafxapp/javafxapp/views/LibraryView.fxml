@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<HBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.javafxapp.javafxapp.ui.pages.LibraryController">
+
+    <VBox styleClass="page" HBox.hgrow="ALWAYS" minWidth="0">
+        <HBox styleClass="toolbar">
+            <Label styleClass="title" text="Library" minWidth="-Infinity"/>
+            <Label fx:id="countLabel" styleClass="badge, badge-off" minWidth="-Infinity"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <TextField fx:id="searchField" promptText="Search games" prefWidth="180.0"/>
+            <Button fx:id="refreshButton" styleClass="secondary-button" text="REFRESH" minWidth="-Infinity"/>
+            <Button fx:id="addFolderButton" styleClass="secondary-button" text="ADD FOLDER…" minWidth="-Infinity"/>
+        </HBox>
+        <FlowPane fx:id="libraryBar" styleClass="library-chips"/>
+
+        <StackPane VBox.vgrow="ALWAYS">
+            <ScrollPane fx:id="gridScroll" fitToWidth="true" hbarPolicy="NEVER">
+                <FlowPane fx:id="grid" styleClass="library-grid"/>
+            </ScrollPane>
+            <VBox fx:id="emptyState" styleClass="empty-state" visible="false">
+                <Label fx:id="emptyIcon" styleClass="empty-icon"/>
+                <Label fx:id="emptyTitle" styleClass="heading"/>
+                <Label fx:id="emptyText" styleClass="muted" wrapText="true" textAlignment="CENTER"/>
+                <Button fx:id="emptyAction" styleClass="secondary-button"/>
+            </VBox>
+        </StackPane>
+    </VBox>
+
+    <VBox fx:id="queuePanel" prefWidth="288.0" minWidth="288.0" maxWidth="288.0" styleClass="side-panel, queue-panel"
+          visible="false" managed="false">
+        <HBox styleClass="toolbar">
+            <Label styleClass="heading" text="Batch queue"/>
+            <Label fx:id="queueCountLabel" styleClass="badge, badge-off"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="clearQueueButton" styleClass="secondary-button" text="CLEAR"/>
+        </HBox>
+        <Label fx:id="batchSettings" styleClass="path-label" wrapText="true" minHeight="-Infinity"/>
+        <ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
+            <VBox fx:id="queueList" styleClass="queue-list"/>
+        </ScrollPane>
+        <VBox fx:id="batchProgressBox" styleClass="progress-box" visible="false" managed="false">
+            <HBox styleClass="toolbar">
+                <Label fx:id="batchCount" styleClass="progress-detail"/>
+                <Region HBox.hgrow="ALWAYS"/>
+                <Label fx:id="batchPercent" styleClass="percent-label"/>
+            </HBox>
+            <ProgressBar fx:id="batchProgress" maxWidth="Infinity" progress="0"/>
+        </VBox>
+        <Button fx:id="defenderButton" maxWidth="Infinity" styleClass="secondary-button" text="EXCLUDE FROM DEFENDER"/>
+        <Button fx:id="patchButton" maxWidth="Infinity" styleClass="primary-button, accent" text="PATCH"/>
+    </VBox>
+</HBox>

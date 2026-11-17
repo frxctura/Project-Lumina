@@ -1,0 +1,78 @@
+.library-grid { -fx-hgap: 16; -fx-vgap: 16; -fx-padding: 4 4 16 0; }
+.game-tile { -fx-padding: 0; }
+.game-tile-card {
+    -fx-background-color: -surface-2;
+    -fx-background-radius: 10;
+    -fx-border-color: transparent;
+    -fx-border-width: 2;
+    -fx-border-radius: 10;
+    -fx-cursor: hand;
+}
+.game-tile-card:hover { -fx-background-color: -surface-3; }
+
+/* the hover shadow is its own layer behind the card, so the tile text stays sharp */
+.game-tile-shadow { -fx-background-color: -surface-2; -fx-background-radius: 10; -fx-opacity: 0; }
+.game-tile:hover .game-tile-shadow { -fx-opacity: 1; -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.45), 14, 0, 0, 4); }
+.game-tile:selected .game-tile-card { -fx-border-color: -accent; }
+.app-root.light .game-tile:hover .game-tile-shadow { -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.16), 14, 0, 0, 4); }
+
+.tile-info { -fx-padding: 12; -fx-spacing: 4; }
+.tile-meta { -fx-spacing: 8; -fx-alignment: center-left; }
+.tile-cover-placeholder { -fx-background-color: linear-gradient(to bottom right, -surface-3, -control); }
+.tile-initial { -fx-font-family: "Nunito Black"; -fx-font-size: 32px; -fx-text-fill: -text-dim; }
+.tile-name { -fx-font-family: "Nunito SemiBold"; -fx-font-size: 13px; }
+.tile-size { -fx-text-fill: -text-dim; -fx-font-size: 12px; }
+
+.tile-check {
+    -fx-min-width: 24; -fx-min-height: 24; -fx-max-width: 24; -fx-max-height: 24;
+    -fx-alignment: center;
+    -fx-font-size: 11px;
+    -fx-font-family: "Nunito Black";
+    -fx-text-fill: transparent;
+    -fx-background-color: rgba(0, 0, 0, 0.45);
+    -fx-background-radius: 999;
+    -fx-border-color: -on-accent;
+    -fx-border-width: 1.5;
+    -fx-border-radius: 999;
+    -fx-opacity: 0;
+}
+.game-tile:hover .tile-check { -fx-opacity: 1; }
+.game-tile:selected .tile-check {
+    -fx-opacity: 1;
+    -fx-text-fill: -on-accent;
+    -fx-background-color: -accent;
+    -fx-border-color: -accent;
+}
+
+.library-chips { -fx-hgap: 8; -fx-vgap: 4; }
+
+.queue-panel .progress-box { -fx-background-color: -surface-3; }
+.queue-list { -fx-spacing: 8; }
+.queue-row { -fx-background-color: -surface-3; }
+.queue-text { -fx-spacing: 4; }
+.queue-icon {
+    -fx-min-width: 16;
+    -fx-alignment: center;
+    -fx-font-family: "Nunito Black";
+    -fx-font-size: 12px;
+    -fx-text-fill: -text-dim;
+}
+.queue-name { -fx-font-family: "Nunito SemiBold"; -fx-font-size: 13px; }
+.queue-detail { -fx-text-fill: -text-dim; -fx-font-size: 12px; }
+
+.queue-row:running { -fx-border-color: -accent; -fx-border-width: 0 0 0 3; -fx-border-radius: 10 0 0 10; }
+.queue-row:running .queue-icon { -fx-text-fill: -accent-hover; }
+.queue-row:done .queue-icon { -fx-text-fill: -success; }
+.queue-row:failed .queue-icon, .queue-row:failed .queue-detail { -fx-text-fill: -danger; }
+.queue-row:skipped .queue-icon, .queue-row:skipped .queue-detail { -fx-text-fill: -warn; }
+
+.queue-progress { -fx-pref-height: 4; }
+.queue-progress > .bar { -fx-padding: 2; }
+
+.queue-remove {
+    -fx-background-color: transparent;
+    -fx-text-fill: -text-dim;
+    -fx-padding: 4 8;
+    -fx-cursor: hand;
+}
+.queue-remove:hover { -fx-text-fill: -text; }

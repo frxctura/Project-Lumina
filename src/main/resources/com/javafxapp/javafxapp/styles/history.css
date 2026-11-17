@@ -1,0 +1,4 @@
+.history-cards { -fx-spacing: 12; -fx-padding: 0 8 16 0; }
+
+.size-label { -fx-text-fill: -text-dim; -fx-font-size: 12px; -fx-font-family: "Nunito Black"; }
+

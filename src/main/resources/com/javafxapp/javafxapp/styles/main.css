@@ -1,0 +1,18 @@
+.info-panel .cover { -fx-background-radius: 6; }
+
+.dlc-table {
+    -fx-background-color: -surface-2;
+    -fx-background-radius: 6;
+    -fx-border-color: -border;
+    -fx-border-radius: 6;
+    -fx-table-cell-border-color: transparent;
+}
+.dlc-table .column-header-background { -fx-background-color: -surface-3; -fx-background-radius: 6 6 0 0; }
+.dlc-table .column-header, .dlc-table .filler { -fx-background-color: transparent; -fx-border-color: transparent; -fx-padding: 4 8; }
+.dlc-table .column-header .label { -fx-text-fill: -text-dim; -fx-font-family: "Nunito Black"; -fx-font-size: 12px; -fx-alignment: center-left; }
+.dlc-table .table-row-cell { -fx-background-color: transparent; -fx-text-fill: -text; -fx-cell-size: 30; }
+.dlc-table .table-row-cell:odd { -fx-background-color: -surface-3; }
+.dlc-table .table-row-cell:selected { -fx-background-color: -accent; }
+.dlc-table .table-cell { -fx-text-fill: -text; -fx-font-size: 12px; -fx-padding: 0 8; -fx-alignment: center-left; }
+.dlc-table .table-row-cell:selected .table-cell { -fx-text-fill: -on-accent; }
+.dlc-table .placeholder .label { -fx-text-fill: -text-dim; }

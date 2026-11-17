@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.Cursor?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane fx:id="shellRoot" prefHeight="520.0" prefWidth="1060.0" styleClass="app-root"
+            stylesheets="@../styles/styles.css, @../styles/main.css, @../styles/library.css, @../styles/history.css"
+            xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+            fx:controller="com.javafxapp.javafxapp.ui.shell.ShellController">
+
+    <left>
+        <VBox alignment="TOP_CENTER" prefWidth="148.0" minWidth="148.0" styleClass="sidebar">
+            <ImageView fx:id="logo" fitWidth="124.0" preserveRatio="true">
+                <Image url="@../images/logo.png"/>
+            </ImageView>
+            <Button fx:id="navHome" styleClass="sidebar-button, nav-button" text="HOME"/>
+            <Button fx:id="navLibrary" styleClass="sidebar-button, nav-button" text="LIBRARY"/>
+            <Button fx:id="navHistory" styleClass="sidebar-button, nav-button" text="HISTORY"/>
+            <Button fx:id="navSettings" styleClass="sidebar-button, nav-button" text="SETTINGS"/>
+            <Region VBox.vgrow="ALWAYS"/>
+            <Button fx:id="themeToggle" styleClass="theme-toggle" focusTraversable="false"/>
+            <Button fx:id="contactButton" maxWidth="Infinity" styleClass="link-button" text="frxctura" focusTraversable="false">
+                <graphic><Region styleClass="github-icon"/></graphic>
+            </Button>
+        </VBox>
+    </left>
+
+    <center>
+        <StackPane styleClass="main-area">
+            <StackPane fx:id="content"/>
+            <VBox fx:id="toastLayer" alignment="BOTTOM_RIGHT" styleClass="toast-layer" pickOnBounds="false"/>
+        </StackPane>
+    </center>
+
+    <bottom>
+        <HBox alignment="CENTER_LEFT" styleClass="status-bar">
+            <Label styleClass="status-version" text="Lumina 1.3"/>
+            <Region fx:id="activityDot" styleClass="activity-dot" visible="false" managed="false"/>
+            <Label fx:id="statusLabel" styleClass="status-text"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label styleClass="status-version" text="Ctrl+O open  ·  Ctrl+Enter start  ·  Esc back/cancel"/>
+        </HBox>
+    </bottom>
+</BorderPane>

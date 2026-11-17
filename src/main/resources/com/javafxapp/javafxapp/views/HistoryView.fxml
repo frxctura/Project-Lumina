@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<VBox styleClass="page" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.javafxapp.javafxapp.ui.pages.HistoryController">
+
+    <VBox styleClass="stack">
+        <HBox styleClass="toolbar">
+            <Label styleClass="title" text="History"/>
+            <Label fx:id="countLabel" styleClass="badge, badge-off"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="cleanupButton" styleClass="secondary-button" text="CLEAN UP…"/>
+            <Button fx:id="clearButton" styleClass="secondary-button" text="CLEAR HISTORY"/>
+        </HBox>
+        <Label styleClass="muted" wrapText="true" minHeight="-Infinity"
+               text="Every patch and restore, and where its backups live. DLL backups (.bak) sit next to the original DLL inside the game folder; full folder copies go to the directory chosen in Settings."/>
+    </VBox>
+
+    <HBox styleClass="card, compact, toolbar">
+        <Label fx:id="summaryLabel" styleClass="heading" text="Measuring backups..."/>
+        <Region HBox.hgrow="ALWAYS"/>
+        <Button fx:id="openBackupFolderButton" styleClass="secondary-button" text="OPEN BACKUP FOLDER"/>
+    </HBox>
+
+    <HBox styleClass="toolbar">
+        <TextField fx:id="searchField" promptText="Search by game or path" HBox.hgrow="ALWAYS" maxWidth="320"/>
+        <HBox fx:id="filterBar" styleClass="toolbar"/>
+    </HBox>
+
+    <StackPane VBox.vgrow="ALWAYS">
+        <ScrollPane fx:id="scroll" fitToWidth="true" hbarPolicy="NEVER">
+            <VBox fx:id="cardBox" styleClass="history-cards"/>
+        </ScrollPane>
+        <Label fx:id="emptyLabel" styleClass="muted" wrapText="true" textAlignment="CENTER" maxWidth="380" visible="false"/>
+    </StackPane>
+</VBox>

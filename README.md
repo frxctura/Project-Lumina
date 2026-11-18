@@ -67,7 +67,7 @@ Prefer building it yourself? Skip to [Building](#building).
     </td>
     <td>
       <img src="screenshots/settings.png" alt="Settings page">
-      <br><b>Settings</b><br>Themes, backup options and the emulators.
+      <br><b>Settings</b><br>Themes, backup options, the three emulators and Steamless.
     </td>
   </tr>
 </table>
@@ -100,6 +100,8 @@ Everything you patch or restore lands in History. From there you can open the ga
 Goldberg is the original, and its last release was in 2023. gbe_fork is the maintained fork. You can download, update or remove either one in Settings and pick which to use per game.
 
 SmokeAPI works differently from the other two. It doesn't pretend to be Steam, it only makes the game think you own its DLC, so you keep your real Steam login. Instead of overwriting the DLL it takes its place and loads the original, which stays next to it as `steam_api64_o.dll`. That file has to be there for the game to start, so Lumina always keeps it, whatever the `.bak` option says, and Restore puts it back.
+
+<p align="center"><img src="screenshots/smokeapi.png" alt="Home page with SmokeAPI selected and SteamStub unpacking ticked" width="760"></p>
 
 Each game also gets its own emulator settings: username, Steam ID, language, offline mode, and a DLC list that Lumina can pull from Steam for you. They're written in whatever format the emulator you picked expects. For SmokeAPI that's just "unlock every DLC" plus any extra DLC Steam doesn't list, in `SmokeAPI.config.json`.
 

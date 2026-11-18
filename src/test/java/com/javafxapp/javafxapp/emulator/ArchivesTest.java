@@ -35,6 +35,15 @@ class ArchivesTest {
     }
 
     @Test
+    void mapsSmokeApiDllsOntoSteamApiNames() throws IOException {
+        Map<String, String> picks = Archives.choose(List.of(
+                "smoke_api32.dll", "smoke_api64.dll", "libsmoke_api32.so", "libsmoke_api64.so", "SmokeAPI.config.json"),
+                Emulator.SMOKEAPI::archiveName);
+        assertEquals("smoke_api32.dll", picks.get("steam_api.dll"));
+        assertEquals("smoke_api64.dll", picks.get("steam_api64.dll"));
+    }
+
+    @Test
     void failsWhenDllMissing() {
         assertThrows(IOException.class, () -> Archives.choose(List.of("steam_api.dll")));
     }

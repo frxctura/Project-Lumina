@@ -82,12 +82,13 @@ public class MainController implements Page {
     @FXML private Label readyTitle, patchBadge, percentLabel, progressDetail;
     @FXML private ComboBox<Emulator> emulatorBox;
     @FXML private TextField appIdField;
-    @FXML private CheckBox backupCheckBox;
+    @FXML private CheckBox backupCheckBox, unpackCheckBox;
+    private boolean syncingBackup;
     @FXML private StepIndicator steps;
     @FXML private ProgressBar progressBar;
     @FXML private ListView<String> logList;
     @FXML private ImageView coverIcon, coverHeader;
-    @FXML private Label gameName, gameSize, fileCount, dllCount, gameExecutable, lastModified, gamePath, backupInfo;
+    @FXML private Label gameName, gameSize, fileCount, dllCount, gameExecutable, lastModified, gamePath, backupInfo, stubInfo;
     @FXML private Hyperlink backupLink;
 
     private Image placeholder() {
@@ -101,6 +102,7 @@ public class MainController implements Page {
         emulatorBox.getItems().setAll(Emulator.values());
         emulatorBox.valueProperty().addListener((o, a, v) -> {
             if (v != null) AppSettings.setEmulator(v);
+            applyBackupOption(isBusy());
             updateButtons();
         });
         emulatorBox.setTooltip(new Tooltip("Which Steam emulator to install into the game"));
@@ -108,8 +110,11 @@ public class MainController implements Page {
         emulatorSettingsButton.setOnAction(e -> openEmulatorSettings());
 
         backupCheckBox.setSelected(AppSettings.isBackupDlls());
-        backupCheckBox.selectedProperty().addListener((o, a, v) -> AppSettings.setBackupDlls(v));
-        backupCheckBox.setTooltip(new Tooltip("Keeps a copy of every original DLL as <name>.dll.bak next to it"));
+        backupCheckBox.selectedProperty().addListener((o, a, v) -> { if (!syncingBackup) AppSettings.setBackupDlls(v); });
+        unpackCheckBox.setSelected(AppSettings.isUnpackDrm());
+        unpackCheckBox.selectedProperty().addListener((o, a, v) -> AppSettings.setUnpackDrm(v));
+        unpackCheckBox.setTooltip(new Tooltip("Removes Steam's SteamStub DRM wrapper from the game's .exe with Steamless, only if it has one. "
+                + "The original is kept as <name>.exe.steamstub.bak."));
 
         appIdField.setTextFormatter(new TextFormatter<String>(c -> c.getControlNewText().matches("\\d{0,10}") ? c : null));
         appIdField.setTooltip(new Tooltip("Steam App ID, written to steam_appid.txt and used to show store info"));
@@ -155,6 +160,8 @@ public class MainController implements Page {
     @Override
     public void onShow() {
         emulatorBox.setValue(AppSettings.getEmulator());
+        unpackCheckBox.setSelected(AppSettings.isUnpackDrm());
+        applyBackupOption(isBusy());
         if (gameDirectory == null) {
             Ui.reveal(selectView, 300);
             showRecent();
@@ -274,7 +281,7 @@ public class MainController implements Page {
     private void clearGameInfo() {
         showCover(placeholder(), null);
         gameName.setText("No game selected");
-        for (Label l : List.of(gameSize, fileCount, dllCount, gameExecutable, lastModified, gamePath, backupInfo)) l.setText("—");
+        for (Label l : List.of(gameSize, fileCount, dllCount, gameExecutable, stubInfo, lastModified, gamePath, backupInfo)) l.setText("—");
         backupLink.setVisible(false);
         patchBadge.setVisible(false);
         updateButtons();
@@ -284,7 +291,7 @@ public class MainController implements Page {
         Path dir = gameDirectory;
         gameName.setText(dir.getFileName().toString());
         gamePath.setText(dir.toString());
-        for (Label l : List.of(gameSize, fileCount, dllCount, gameExecutable, lastModified, backupInfo)) l.setText("…");
+        for (Label l : List.of(gameSize, fileCount, dllCount, gameExecutable, stubInfo, lastModified, backupInfo)) l.setText("…");
 
         record Loaded(GameInfo info, Optional<HistoryEntry> patch, Image icon) {}
         Task<Loaded> task = new Task<>() {
@@ -318,6 +325,7 @@ public class MainController implements Page {
         gameExecutable.setText(info.executable().map(p -> p.getFileName().toString()).orElse("None found"));
         lastModified.setText(info.lastModified());
         showBackupInfo();
+        stubInfo.setText(info.stubCount() == 0 ? "None" : info.stubCount() + (info.stubCount() == 1 ? " exe has DRM" : " exes have DRM"));
 
         if (coverHeader.getImage() == null) showCover(icon != null ? icon : placeholder(), null);
         if (appIdField.getText().isBlank()) info.appId().ifPresent(id -> {
@@ -325,7 +333,10 @@ public class MainController implements Page {
             log("Detected Steam App ID " + id, false);
         });
         if (firstLoad && info.dllCount() == 0) log("No steam_api DLLs found in this folder.", true);
-        if (firstLoad && info.backupCount() > 0) log(info.backupCount() + " .bak backup(s) found, this game was patched before.", false);
+        if (firstLoad && info.backupCount() > 0) log(info.backupCount() + " backup file(s) found, this game was patched before.", false);
+        if (firstLoad && info.stubCount() > 0)
+            log("SteamStub DRM found in " + info.stubCount() + " executable(s)."
+                    + (AppSettings.isUnpackDrm() ? " It will be removed when patching." : " Tick \"Unpack SteamStub DRM\" to remove it when patching."), false);
         updateButtons();
     }
 
@@ -370,10 +381,11 @@ public class MainController implements Page {
         int baks = gameInfo.backupCount();
         boolean folder = lastPatch.map(HistoryEntry::folderBackupExists).orElse(false);
         String text = baks == 0 && !folder ? "None"
-                : (baks > 0 ? baks + " .bak beside DLLs" : "") + (baks > 0 && folder ? "\n" : "") + (folder ? "Full folder copy" : "");
+                : (baks > 0 ? baks + (baks == 1 ? " file beside the originals" : " files beside the originals") : "")
+                + (baks > 0 && folder ? "\n" : "") + (folder ? "Full folder copy" : "");
         backupInfo.setText(text);
         backupLink.setVisible(baks > 0 || folder);
-        backupLink.setText(folder ? "Open folder backup" : "Show .bak file");
+        backupLink.setText(folder ? "Open folder backup" : "Show backup file");
     }
 
     private void openBackupLocation() {
@@ -436,7 +448,7 @@ public class MainController implements Page {
         }
 
         var request = new CrackJob.Request(gameDirectory, emulatorBox.getValue(), backupCheckBox.isSelected(),
-                appIdField.getText().trim(), AppSettings.backupTarget(), AppSettings.moveTarget());
+                appIdField.getText().trim(), AppSettings.backupTarget(), AppSettings.moveTarget(), AppSettings.isUnpackDrm());
         if (gameInfo != null) {
             try {
                 CrackJob.checkSpace(request, gameInfo.totalSize());
@@ -458,7 +470,7 @@ public class MainController implements Page {
         };
         planning = true;
         setBusy(true);
-        DefenderPrompt.offer(shell, request.emulator(), List.of(request.gameDir()), next);
+        DefenderPrompt.offer(shell, request.emulator(), List.of(request.gameDir()), request.unpackDrm(), next);
     }
 
     private void preview(CrackJob.Request request, Runnable start) {
@@ -488,23 +500,35 @@ public class MainController implements Page {
         Path dir = request.gameDir();
         List<String> files = new ArrayList<>();
         for (CrackJob.PlannedDll d : plan.dlls()) {
-            String what = d.upToDate() ? "already up to date, left alone"
-                    : "replaced" + (d.newBackup() ? ", original kept as .bak"
+            String what;
+            if (d.upToDate()) what = "already up to date, left alone";
+            else if (d.proxy()) what = "replaced by " + request.emulator() + (d.newBackup() ? ", original moved to " + SteamApi.proxyBackupOf(d.dll()).getFileName()
+                    : ", existing " + SteamApi.proxyBackupOf(d.dll()).getFileName() + " kept");
+            else what = "replaced" + (d.newBackup() ? ", original kept as .bak"
                     : d.keepsBackup() ? ", existing .bak kept" : request.backupDlls() ? "" : ", no backup");
             files.add(dir.relativize(d.dll()) + "  ·  " + what);
+        }
+        // a folder without steam_api DLLs is skipped whole, executables included
+        List<Path> stubs = plan.dlls().isEmpty() ? List.of() : plan.stubExes();
+        boolean unpack = plan.unpackDrm() && !stubs.isEmpty();
+        for (Path exe : stubs) {
+            files.add(dir.relativize(exe) + "  ·  " + (plan.unpackDrm() ? "SteamStub DRM removed, original kept as " + SteamApi.exeBackupOf(exe).getFileName()
+                    : "has SteamStub DRM, left as it is (turn on unpacking to remove it)"));
         }
 
         List<String> steps = new ArrayList<>();
         plan.folderBackup().ifPresent(p -> steps.add("The whole folder (" + FileOps.formatSize(plan.gameSize()) + ") is copied to " + p + " first."));
-        if (SteamStore.isValidAppId(request.appId())) steps.add("App ID " + request.appId() + " is written to steam_appid.txt.");
+        if (request.emulator().writesAppId() && SteamStore.isValidAppId(request.appId())) steps.add("App ID " + request.appId() + " is written to steam_appid.txt.");
         plan.moveTo().ifPresent(p -> steps.add("Afterwards the game is moved to " + p + "."));
         plan.problem().ifPresent(p -> steps.add("⚠ " + p));
 
+        String exes = stubs.size() + (stubs.size() == 1 ? " exe" : " exes");
         String title = plan.dlls().isEmpty() ? "No steam_api DLLs in this folder"
+                : plan.toPatch() == 0 && unpack ? "Unpack SteamStub DRM from " + exes + "?"
                 : plan.toPatch() == 0 ? "Already patched with " + request.emulator()
-                : "Patch " + plan.toPatch() + " DLL(s) with " + request.emulator() + "?";
+                : "Patch " + plan.toPatch() + " DLL(s)" + (unpack ? " and unpack " + exes : "") + " with " + request.emulator() + "?";
         String message = plan.dlls().isEmpty() ? "There's nothing here for Lumina to patch."
-                : plan.toPatch() == 0 ? "Every DLL already matches, so nothing is replaced."
+                : plan.toPatch() == 0 && !unpack ? "Every DLL already matches, so nothing is replaced."
                 : steps.isEmpty() ? null : String.join(" ", steps);
 
         CheckBox again = new CheckBox("Show this before every patch");
@@ -540,7 +564,7 @@ public class MainController implements Page {
                 return;
             }
             boolean moved = !r.location().equals(request.gameDir());
-            if (r.patched() == 0 && !moved) {
+            if (r.patched() == 0 && r.unpacked() == 0 && !moved) {
                 shell.setStatus(r.upToDate() > 0 ? "Already up to date" : "Nothing to patch");
                 shell.toast(Toaster.Kind.INFO, r.upToDate() > 0
                         ? "Already patched with " + request.emulator() + ", nothing needed rewriting."
@@ -548,15 +572,21 @@ public class MainController implements Page {
                 return;
             }
             History.add(HistoryEntry.patch(game, r.location(), request.emulator().toString(), r.verified(), r.failed(),
-                    r.dllBackups(), r.folderBackup()));
+                    r.unpacked(), r.dllBackups(), r.folderBackup()));
             if (!r.location().equals(gameDirectory)) {
                 gameDirectory = r.location();
                 AppSettings.addRecentGame(gameDirectory);
                 log("Game now lives at " + gameDirectory, false);
             }
-            if (r.failed() == 0) {
-                shell.setStatus("Patched and verified " + r.verified() + " file(s) with " + request.emulator());
-                shell.toast(Toaster.Kind.SUCCESS, "Patched and verified " + r.verified() + " file(s) with " + request.emulator() + ".",
+            if (r.failed() == 0 && r.unpackFailed() > 0) {
+                shell.setStatus("Patched, but " + r.unpackFailed() + " exe could not be unpacked");
+                shell.toast(Toaster.Kind.ERROR, "Patched " + r.verified() + " file(s), but Steamless could not unpack "
+                        + r.unpackFailed() + " executable(s), so the game may not start. See the log for details.",
+                        "Show backups", () -> shell.show(AppShell.View.HISTORY));
+            } else if (r.failed() == 0) {
+                String unpacked = r.unpacked() > 0 ? " and unpacked " + r.unpacked() + " exe" : "";
+                shell.setStatus("Patched and verified " + r.verified() + " file(s) with " + request.emulator() + unpacked);
+                shell.toast(Toaster.Kind.SUCCESS, "Patched and verified " + r.verified() + " file(s) with " + request.emulator() + unpacked + ".",
                         "Show backups", () -> shell.show(AppShell.View.HISTORY));
                 flashCrackButton();
             } else {
@@ -571,7 +601,7 @@ public class MainController implements Page {
         if (!Ui.prompt(shell.window())
                 .title("Exclude this game from Defender?")
                 .message("Defender stops scanning these folders, so it can't quarantine the emulator DLLs again.")
-                .details(List.of(dir.toString(), AppPaths.emulators().toString()))
+                .details(List.of(dir.toString(), AppPaths.emulators().toString(), AppPaths.tools().toString()))
                 .note("Windows will ask for administrator permission.")
                 .confirm("ADD EXCLUSION").width(540)
                 .ask()) return;
@@ -581,7 +611,8 @@ public class MainController implements Page {
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() throws Exception {
-                DefenderExclusion.add(List.of(dir, AppPaths.emulators()));
+                java.nio.file.Files.createDirectories(AppPaths.tools());
+                DefenderExclusion.add(List.of(dir, AppPaths.emulators(), AppPaths.tools()));
                 return null;
             }
         };
@@ -607,8 +638,8 @@ public class MainController implements Page {
     private void startRestore() {
         if (isBusy() || gameInfo == null || gameInfo.backupCount() == 0) return;
         if (!Ui.prompt(shell.window())
-                .title("Put the original DLLs back?")
-                .message(gameInfo.backupCount() + " original DLL(s) are restored from their .bak backups, replacing the emulator.")
+                .title("Put the original files back?")
+                .message(gameInfo.backupCount() + " backup file(s) are restored (.bak, *_o.dll and unpacked executables), replacing the emulator.")
                 .confirm("RESTORE")
                 .ask()) return;
         String game = gameName.getText();
@@ -620,7 +651,7 @@ public class MainController implements Page {
         run(new RestoreJob(dir, sink()), restored -> {
             History.add(HistoryEntry.restore(game, dir, restored));
             shell.setStatus("Restored " + restored + " file(s)");
-            shell.toast(Toaster.Kind.SUCCESS, "Restored " + restored + " original DLL(s).");
+            shell.toast(Toaster.Kind.SUCCESS, "Restored " + restored + " original file(s).");
         });
     }
 
@@ -773,8 +804,25 @@ public class MainController implements Page {
         progressBox.setManaged(false);
     }
 
+    /** SmokeAPI needs the original next to it as _o.dll, so for it the .bak option is shown as on and locked. */
+    private void applyBackupOption(boolean busy) {
+        boolean proxy = emulatorBox.getValue() != null && emulatorBox.getValue().isProxy();
+        syncingBackup = true;
+        try {
+            backupCheckBox.setSelected(proxy || AppSettings.isBackupDlls());
+        } finally {
+            syncingBackup = false;
+        }
+        backupCheckBox.setText(proxy ? "Original steam_api DLLs are kept as _o.dll (SmokeAPI needs them)" : "Back up original steam_api DLLs (.bak)");
+        backupCheckBox.setTooltip(new Tooltip(proxy
+                ? "SmokeAPI loads the original DLL from <name>_o.dll beside it, so it is always kept."
+                : "Keeps a copy of every original DLL as <name>.dll.bak next to it."));
+        backupCheckBox.setDisable(busy || proxy);
+    }
+
     private void setBusy(boolean busy) {
-        for (Control c : List.of(backButton, changeDirButton, backupCheckBox, emulatorBox, appIdField, emulatorSettingsButton)) c.setDisable(busy);
+        for (Control c : List.of(backButton, changeDirButton, unpackCheckBox, emulatorBox, appIdField, emulatorSettingsButton)) c.setDisable(busy);
+        applyBackupOption(busy);
         shell.setNavigationLocked(busy);
         crackButton.getStyleClass().removeAll("accent", "danger");
         crackButton.getStyleClass().add(busy ? "danger" : "accent");
@@ -808,11 +856,11 @@ public class MainController implements Page {
                 .flatMap(name -> Arrays.stream(Emulator.values()).filter(e -> e.toString().equals(name)).findFirst())
                 .orElse(emulatorBox.getValue());
         List<Path> dirs = gameInfo.patch().dlls().stream()
-                .map(d -> EmulatorConfig.settingsDir(d.dll()))
+                .map(d -> emulator.settingsDir(d.dll()))
                 .distinct()
                 .toList();
         if (EmulatorSettingsDialog.show(shell.window(), gameName.getText(), dirs, emulator, appIdField.getText().trim())) {
-            log("Saved " + emulator + " settings to " + dirs.size() + " steam_settings folder(s).", false);
+            log("Saved " + emulator + " settings to " + dirs.size() + " " + emulator.settingsLocation() + " location(s).", false);
             shell.toast(Toaster.Kind.SUCCESS, "Emulator settings saved.");
         }
     }

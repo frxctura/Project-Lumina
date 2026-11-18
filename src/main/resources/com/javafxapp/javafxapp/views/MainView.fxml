@@ -45,6 +45,7 @@
                 </HBox>
             </HBox>
             <CheckBox fx:id="backupCheckBox" mnemonicParsing="false" styleClass="app-check" text="Back up original steam_api DLLs (.bak)"/>
+            <CheckBox fx:id="unpackCheckBox" mnemonicParsing="false" styleClass="app-check" text="Unpack SteamStub DRM from the game's .exe (Steamless)"/>
 
             <VBox fx:id="progressBox" styleClass="progress-box">
                 <StepIndicator fx:id="steps"/>
@@ -90,16 +91,18 @@
             <Label fx:id="dllCount" styleClass="info-value" wrapText="true" GridPane.rowIndex="2" GridPane.columnIndex="1"/>
             <Label styleClass="info-key" text="Executable" GridPane.rowIndex="3"/>
             <Label fx:id="gameExecutable" styleClass="info-value" GridPane.rowIndex="3" GridPane.columnIndex="1"/>
-            <Label styleClass="info-key" text="Modified" GridPane.rowIndex="4"/>
-            <Label fx:id="lastModified" styleClass="info-value" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
-            <Label styleClass="info-key" text="Backups" GridPane.rowIndex="5" GridPane.valignment="TOP"/>
-            <VBox styleClass="stack" GridPane.rowIndex="5" GridPane.columnIndex="1">
+            <Label styleClass="info-key" text="SteamStub" GridPane.rowIndex="4" GridPane.valignment="TOP"/>
+            <Label fx:id="stubInfo" styleClass="info-value" wrapText="true" GridPane.rowIndex="4" GridPane.columnIndex="1"/>
+            <Label styleClass="info-key" text="Modified" GridPane.rowIndex="5"/>
+            <Label fx:id="lastModified" styleClass="info-value" GridPane.rowIndex="5" GridPane.columnIndex="1"/>
+            <Label styleClass="info-key" text="Backups" GridPane.rowIndex="6" GridPane.valignment="TOP"/>
+            <VBox styleClass="stack" GridPane.rowIndex="6" GridPane.columnIndex="1">
                 <Label fx:id="backupInfo" styleClass="info-value" wrapText="true"/>
                 <Hyperlink fx:id="backupLink" styleClass="inline-link"/>
             </VBox>
-            <Label styleClass="info-key" text="Path" GridPane.rowIndex="6" GridPane.valignment="TOP"/>
+            <Label styleClass="info-key" text="Path" GridPane.rowIndex="7" GridPane.valignment="TOP"/>
             <Label fx:id="gamePath" styleClass="info-value, muted" wrapText="true" maxHeight="48"
-                   GridPane.rowIndex="6" GridPane.columnIndex="1"/>
+                   GridPane.rowIndex="7" GridPane.columnIndex="1"/>
         </GridPane>
     </VBox>
 </HBox>

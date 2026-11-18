@@ -19,6 +19,23 @@ class SteamTest {
     }
 
     @Test
+    void recognisesProxyOriginalsAndExeBackups() {
+        assertTrue(SteamApi.isBackup("steam_api64_o.dll"));
+        assertTrue(SteamApi.isBackup("steam_api_o.dll"));
+        assertFalse(SteamApi.isBackup("other_o.dll"));
+        assertTrue(SteamApi.isBackup("game.exe.steamstub.bak"));
+        assertFalse(SteamApi.isBackup("game.dll.steamstub.bak"));
+        assertFalse(SteamApi.isBackup("game.exe.bak")); // a .bak Lumina didn't make is left alone
+
+        Path dll = Path.of("g", "steam_api64.dll");
+        assertEquals(Path.of("g", "steam_api64_o.dll"), SteamApi.proxyBackupOf(dll));
+        assertEquals(dll, SteamApi.originalOf(SteamApi.proxyBackupOf(dll)));
+        Path exe = Path.of("g", "Game.exe");
+        assertEquals(Path.of("g", "Game.exe.steamstub.bak"), SteamApi.exeBackupOf(exe));
+        assertEquals(exe, SteamApi.originalOf(SteamApi.exeBackupOf(exe)));
+    }
+
+    @Test
     void validatesAppIds() {
         assertTrue(SteamStore.isValidAppId("480"));
         assertFalse(SteamStore.isValidAppId(""));

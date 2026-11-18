@@ -23,6 +23,7 @@ public final class AppSettings {
     private static final String BACKUP_GAME_DIR_PATH = "backupGameDirPath";
     private static final String BACKUP_DLLS = "backupDlls";
     private static final String PREVIEW_BEFORE_PATCH = "previewBeforePatch";
+    private static final String UNPACK_DRM = "unpackDrm";
     private static final String EMULATOR = "emulator";
     private static final String RECENT_GAMES = "recentGames";
     private static final String DEFENDER_ASKED = "defenderAsked";
@@ -54,6 +55,9 @@ public final class AppSettings {
 
     public static boolean isPreviewBeforePatch()      { return PREFS.getBoolean(PREVIEW_BEFORE_PATCH, true); }
     public static void setPreviewBeforePatch(boolean v) { PREFS.putBoolean(PREVIEW_BEFORE_PATCH, v); }
+
+    public static boolean isUnpackDrm()               { return PREFS.getBoolean(UNPACK_DRM, false); }
+    public static void setUnpackDrm(boolean v)         { PREFS.putBoolean(UNPACK_DRM, v); }
 
     public static Emulator getEmulator() {
         try {
@@ -146,6 +150,7 @@ public final class AppSettings {
         setBackupGameDirPath("");
         setBackupDlls(true);
         setPreviewBeforePatch(true);
+        setUnpackDrm(false);
         setEmulator(Emulator.GOLDBERG);
         PREFS.remove(DEFENDER_ASKED);
     }

@@ -94,7 +94,7 @@ public final class EmulatorSettingsDialog {
         Label title = new Label("Emulator settings");
         title.getStyleClass().add("title");
         Label sub = new Label(game + "  ·  " + emulator + "  ·  saved to " + settingsDirs.size()
-                + " steam_settings folder" + (settingsDirs.size() == 1 ? "" : "s"));
+                + " " + emulator.settingsLocation() + (settingsDirs.size() == 1 ? " location" : " locations"));
         sub.getStyleClass().add("subtitle");
         sub.setTooltip(new Tooltip(String.join("\n", settingsDirs.stream().map(Path::toString).toList())));
         return Layout.column("stack", title, sub);
@@ -117,6 +117,9 @@ public final class EmulatorSettingsDialog {
         addRow(grid, 1, "Steam ID", steamId);
         addRow(grid, 2, "Language", language);
         grid.add(offline, 1, 3);
+        // SmokeAPI leaves the player's own Steam account alone, so there is no username, ID, language or offline switch
+        grid.setVisible(emulator.supportsIdentity());
+        grid.setManaged(emulator.supportsIdentity());
         return grid;
     }
 
@@ -164,9 +167,19 @@ public final class EmulatorSettingsDialog {
         clear.setOnAction(e -> dlcs.clear());
 
         unlockAll.getStyleClass().add("app-check");
-        unlockAll.setVisible(emulator == Emulator.GBE_FORK);
-        unlockAll.setManaged(emulator == Emulator.GBE_FORK);
+        unlockAll.setVisible(emulator.supportsUnlockAll());
+        unlockAll.setManaged(emulator.supportsUnlockAll());
+        if (emulator == Emulator.SMOKEAPI) {
+            unlockAll.setText("Unlock every DLC the game lists on Steam");
+            title.setText("Extra DLC");
+            title.setTooltip(new Tooltip("DLC without a store page, which Steam doesn't list. Needs the game's App ID."));
+        }
         fetchStatus.getStyleClass().add("progress-detail");
+        if (emulator == Emulator.SMOKEAPI && !SteamStore.isValidAppId(appId)) {
+            // SmokeAPI files extra DLC under the game's App ID, so there is nowhere to put it without one
+            add.setDisable(true);
+            fetchStatus.setText("Set the Steam App ID on the main screen to add extra DLC.");
+        }
 
         HBox bar = Layout.row("toolbar", title, dlcCount, Layout.spacer(), fetchButton, add, remove, clear);
         bar.setAlignment(Pos.CENTER_LEFT);
@@ -194,7 +207,7 @@ public final class EmulatorSettingsDialog {
 
     private void load() {
         try {
-            EmulatorConfig config = EmulatorConfig.load(settingsDirs.get(0), emulator);
+            EmulatorConfig config = EmulatorConfig.load(settingsDirs.get(0), emulator, appId);
             username.setText(config.username());
             steamId.setText(config.steamId());
             language.setValue(config.language().isBlank() ? null : config.language());
@@ -223,7 +236,7 @@ public final class EmulatorSettingsDialog {
         EmulatorConfig config = new EmulatorConfig(username.getText().trim(), id, lang, offline.isSelected(),
                 unlockAll.isSelected(), list);
         try {
-            for (Path dir : settingsDirs) config.save(dir, emulator);
+            for (Path dir : settingsDirs) config.save(dir, emulator, appId);
             Log.info("Saved emulator settings to " + settingsDirs);
             saved = true;
             stage.close();

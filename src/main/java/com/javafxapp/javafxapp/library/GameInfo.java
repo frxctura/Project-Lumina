@@ -2,6 +2,7 @@ package com.javafxapp.javafxapp.library;
 
 import com.javafxapp.javafxapp.patching.PatchDetector;
 import com.javafxapp.javafxapp.patching.SteamApi;
+import com.javafxapp.javafxapp.unpack.SteamStub;
 
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelWriter;
@@ -23,7 +24,7 @@ import java.util.stream.Stream;
 
 public record GameInfo(Path path, long totalSize, long fileCount, Optional<Path> executable,
                        String lastModified, int dllCount, int backupCount, Optional<String> appId,
-                       PatchDetector.Report patch) {
+                       PatchDetector.Report patch, int stubCount) {
 
     private static final DateTimeFormatter DATE_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
@@ -31,7 +32,7 @@ public record GameInfo(Path path, long totalSize, long fileCount, Optional<Path>
     public static GameInfo scan(Path dir) throws IOException {
         var acc = new Object() {
             long size, count, bestExeScore = Long.MIN_VALUE;
-            int backups;
+            int backups, stubs;
             final List<Path> dlls = new ArrayList<>();
             Path exe, appIdFile;
         };
@@ -42,6 +43,7 @@ public record GameInfo(Path path, long totalSize, long fileCount, Optional<Path>
                 acc.size += fileSize;
                 acc.count++;
                 String name = p.getFileName().toString().toLowerCase();
+                if (name.endsWith(".exe") && !name.endsWith(".unpacked.exe") && SteamStub.isProtected(p)) acc.stubs++;
                 if (SteamApi.isDll(name)) acc.dlls.add(p);
                 else if (SteamApi.isBackup(name)) acc.backups++;
                 else if (name.equals(SteamApi.APPID_FILE) && acc.appIdFile == null) acc.appIdFile = p;
@@ -59,7 +61,7 @@ public record GameInfo(Path path, long totalSize, long fileCount, Optional<Path>
         String modified = DATE_FORMAT.format(Files.getLastModifiedTime(dir).toInstant());
         Optional<String> appId = Optional.ofNullable(acc.appIdFile).flatMap(SteamApi::readAppId);
         return new GameInfo(dir, acc.size, acc.count, Optional.ofNullable(acc.exe), modified, acc.dlls.size(), acc.backups, appId,
-                PatchDetector.inspect(acc.dlls));
+                PatchDetector.inspect(acc.dlls), acc.stubs);
     }
 
     private static boolean isHelperExe(String name) {

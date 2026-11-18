@@ -26,7 +26,9 @@ public final class EmulatorInstaller {
             "https://gitlab.com/Mr_Goldberg/goldberg_emulator/-/jobs/4247811310/artifacts/download";
     private static final String GBE_LATEST_API = "https://api.github.com/repos/Detanup01/gbe_fork/releases/latest";
     private static final Pattern GBE_ASSET = Pattern.compile(".*/emu-win-release(-vs\\d+)?\\.7z");
-    private static final Pattern TAG = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+    private static final String SMOKE_LATEST_API = "https://api.github.com/repos/acidicoala/SmokeAPI/releases/latest";
+    private static final Pattern SMOKE_ASSET = Pattern.compile(".*/SmokeAPI-v[\\d.]+\\.zip");
+    private static final Pattern TAG =Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern ASSET_URL = Pattern.compile("\"browser_download_url\"\\s*:\\s*\"([^\"]+)\"");
 
     private EmulatorInstaller() {}
@@ -47,7 +49,7 @@ public final class EmulatorInstaller {
                 throw new IOException("The " + emulator + " download disappeared right after it finished, most likely removed by antivirus."
                         + " Add a Defender exclusion for " + AppPaths.emulators() + " and try again.");
             log.info("Extracting...");
-            Archives.extractSteamApi(archive, release.format(), staging);
+            Archives.extractSteamApi(archive, release.format(), staging, emulator::archiveName);
             Files.writeString(staging.resolve(Emulator.VERSION_FILE), release.version());
 
             FileOps.deleteRecursive(fresh);
@@ -56,7 +58,7 @@ public final class EmulatorInstaller {
             for (String dll : SteamApi.DLL_NAMES)
                 if (!Files.isRegularFile(fresh.resolve(dll)))
                     throw new IOException(emulator + " " + release.version() + " is missing " + dll + ". The current install was kept.");
-            swapIn(emulator, fresh);
+            FileOps.replaceDirectory(fresh, emulator.dir());
             log.info(emulator + " " + release.version() + " installed.");
         } finally {
             Files.deleteIfExists(archive);
@@ -65,24 +67,8 @@ public final class EmulatorInstaller {
         }
     }
 
-    // keep the old install until the new one is complete
-    private static void swapIn(Emulator emulator, Path fresh) throws IOException {
-        Path dir = emulator.dir();
-        Path old = sibling(emulator, ".old");
-        FileOps.deleteRecursive(old);
-        boolean hadOld = Files.exists(dir);
-        if (hadOld) Files.move(dir, old);
-        try {
-            Files.move(fresh, dir);
-        } catch (IOException e) {
-            if (hadOld) Files.move(old, dir);
-            throw e;
-        }
-        FileOps.deleteQuietly(old);
-    }
-
     public static void recover(Emulator emulator) {
-        Path old = sibling(emulator, ".old");
+        Path old = FileOps.previousOf(emulator.dir());
         if (!Files.isDirectory(old)) return;
         try {
             if (emulator.isInstalled()) {
@@ -124,21 +110,24 @@ public final class EmulatorInstaller {
     private static Release resolve(Emulator emulator) throws IOException, InterruptedException {
         return switch (emulator) {
             case GOLDBERG -> new Release(GOLDBERG_URL, "2023-05 (475342f0)", Archives.Format.ZIP);
-            case GBE_FORK -> latestGbeFork();
+            case GBE_FORK -> latestGithub(GBE_LATEST_API, GBE_ASSET, Archives.Format.SEVEN_Z, "gbe_fork");
+            case SMOKEAPI -> latestGithub(SMOKE_LATEST_API, SMOKE_ASSET, Archives.Format.ZIP, "SmokeAPI");
         };
     }
 
-    private static Release latestGbeFork() throws IOException, InterruptedException {
-        String json = Http.getString(GBE_LATEST_API);
+    /** The newest GitHub release of a project, and the download in it whose URL matches {@code asset}. */
+    private static Release latestGithub(String api, Pattern asset, Archives.Format format, String project)
+            throws IOException, InterruptedException {
+        String json = Http.getString(api);
         Matcher tag = TAG.matcher(json);
         String version = tag.find() ? tag.group(1) : "latest";
 
         List<String> candidates = new ArrayList<>();
         Matcher m = ASSET_URL.matcher(json);
-        while (m.find()) if (GBE_ASSET.matcher(m.group(1)).matches()) candidates.add(m.group(1));
+        while (m.find()) if (asset.matcher(m.group(1)).matches()) candidates.add(m.group(1));
 
         String url = candidates.stream().min(Comparator.naturalOrder())
-                .orElseThrow(() -> new IOException("No Windows release found in gbe_fork " + version));
-        return new Release(url, version, Archives.Format.SEVEN_Z);
+                .orElseThrow(() -> new IOException("No Windows release found in " + project + " " + version));
+        return new Release(url, version, format);
     }
 }

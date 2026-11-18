@@ -27,7 +27,8 @@ public final class BatchJob extends Job<BatchJob.Summary> {
 
     public record Item(Path dir, String name, String appId) {}
 
-    public record Settings(Emulator emulator, boolean backupDlls, Optional<Path> backupRoot, Optional<Path> moveRoot) {}
+    public record Settings(Emulator emulator, boolean backupDlls, Optional<Path> backupRoot, Optional<Path> moveRoot,
+                           boolean unpackDrm) {}
 
     public record Summary(int done, int failed, int skipped, boolean stopped) {}
 
@@ -130,7 +131,7 @@ public final class BatchJob extends Job<BatchJob.Summary> {
         };
         String appId = item.appId().isBlank() ? findAppId(item.dir()) : item.appId();
         CrackJob crack = new CrackJob(new CrackJob.Request(item.dir(), settings.emulator(), settings.backupDlls(), appId,
-                settings.backupRoot(), settings.moveRoot()), sink);
+                settings.backupRoot(), settings.moveRoot(), settings.unpackDrm()), sink);
         current = crack;
         if (stopRequested) crack.cancel();
         notify(index, State.RUNNING, "Starting...", crack);
@@ -158,13 +159,15 @@ public final class BatchJob extends Job<BatchJob.Summary> {
             return State.FAILED;
         }
         boolean moved = !r.location().equals(item.dir());
-        if (r.patched() == 0 && !moved) {
+        if (r.patched() == 0 && r.unpacked() == 0 && !moved) {
             notify(index, State.SKIPPED, r.upToDate() > 0 ? "Already up to date" : "No steam_api DLLs found", null);
             return State.SKIPPED;
         }
         History.add(HistoryEntry.patch(item.name(), r.location(), settings.emulator().toString(), r.patched(), r.failed(),
-                r.dllBackups(), r.folderBackup()));
+                r.unpacked(), r.dllBackups(), r.folderBackup()));
         String text = r.patched() > 0 ? "Patched " + r.patched() + " file(s)" : "Already up to date";
+        if (r.unpacked() > 0) text += "  ·  unpacked " + r.unpacked() + " exe";
+        if (r.unpackFailed() > 0) text += "  ·  " + r.unpackFailed() + " exe could not be unpacked";
         notify(index, State.DONE, text + (moved ? "  ·  moved" : ""), null);
         return State.DONE;
     }

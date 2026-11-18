@@ -48,6 +48,7 @@ public final class History {
         p.setProperty("emulator", entry.emulator());
         p.setProperty("files", String.valueOf(entry.files()));
         p.setProperty("failed", String.valueOf(entry.failed()));
+        p.setProperty("unpacked", String.valueOf(entry.unpacked()));
         for (int i = 0; i < entry.dllBackups().size(); i++)
             p.setProperty("dllBackup." + i, entry.dllBackups().get(i).toString());
         entry.folderBackup().ifPresent(f -> p.setProperty("folderBackup", f.toString()));
@@ -92,7 +93,8 @@ public final class History {
                     Integer.parseInt(p.getProperty("files", "0")),
                     Integer.parseInt(p.getProperty("failed", "0")),
                     backups,
-                    Optional.ofNullable(p.getProperty("folderBackup")).map(Path::of)));
+                    Optional.ofNullable(p.getProperty("folderBackup")).map(Path::of),
+                    Integer.parseInt(p.getProperty("unpacked", "0")))); // entries from before unpacking existed have none
         } catch (Exception e) {
             Log.error("Skipping unreadable history entry " + file, e);
             return Optional.empty();

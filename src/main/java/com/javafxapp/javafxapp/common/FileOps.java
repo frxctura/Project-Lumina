@@ -71,6 +71,29 @@ public final class FileOps {
         }
     }
 
+    /** Where {@link #replaceDirectory} parks the previous contents of {@code dir} while it swaps. */
+    public static Path previousOf(Path dir) {
+        return dir.resolveSibling(dir.getFileName() + ".old");
+    }
+
+    /**
+     * Replaces {@code dir} with {@code fresh} (a sibling on the same drive). The old contents are kept aside until
+     * the swap worked, and put back if it fails, so {@code dir} is never left empty.
+     */
+    public static void replaceDirectory(Path fresh, Path dir) throws IOException {
+        Path old = previousOf(dir);
+        deleteRecursive(old);
+        boolean hadOld = Files.exists(dir);
+        if (hadOld) Files.move(dir, old);
+        try {
+            Files.move(fresh, dir);
+        } catch (IOException e) {
+            if (hadOld) Files.move(old, dir);
+            throw e;
+        }
+        deleteQuietly(old);
+    }
+
     public static void deleteRecursive(Path path) throws IOException {
         if (!Files.exists(path)) return;
         try (Stream<Path> paths = Files.walk(path)) {

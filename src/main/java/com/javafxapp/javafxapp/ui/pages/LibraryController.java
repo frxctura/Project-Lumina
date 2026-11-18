@@ -351,7 +351,9 @@ public class LibraryController implements Page {
     }
 
     private void updateBatchSettings() {
-        String text = AppSettings.getEmulator() + "  ·  " + (AppSettings.isBackupDlls() ? ".bak backups" : "no .bak backups");
+        String text = AppSettings.getEmulator() + "  ·  " + (AppSettings.getEmulator().isProxy() ? "originals kept as _o.dll"
+                : AppSettings.isBackupDlls() ? ".bak backups" : "no .bak backups");
+        if (AppSettings.isUnpackDrm()) text += "  ·  unpack SteamStub DRM";
         if (AppSettings.backupTarget().isPresent()) text += "  ·  full folder copy";
         if (AppSettings.moveTarget().isPresent()) text += "  ·  move afterwards";
         batchSettings.setText(text);
@@ -367,9 +369,9 @@ public class LibraryController implements Page {
             return;
         }
         var settings = new BatchJob.Settings(AppSettings.getEmulator(), AppSettings.isBackupDlls(),
-                AppSettings.backupTarget(), AppSettings.moveTarget());
+                AppSettings.backupTarget(), AppSettings.moveTarget(), AppSettings.isUnpackDrm());
         patchButton.setDisable(true);
-        DefenderPrompt.offer(shell, settings.emulator(), rows.stream().map(r -> r.dir).toList(), () -> {
+        DefenderPrompt.offer(shell, settings.emulator(), rows.stream().map(r -> r.dir).toList(), settings.unpackDrm(), () -> {
             patchButton.setDisable(false);
             confirmAndRun(rows, settings);
         });
@@ -397,7 +399,7 @@ public class LibraryController implements Page {
                 List<GamePlan> plans = new ArrayList<>();
                 for (QueueRow r : rows) {
                     var req = new CrackJob.Request(r.dir, settings.emulator(), settings.backupDlls(), r.appId(),
-                            settings.backupRoot(), settings.moveRoot());
+                            settings.backupRoot(), settings.moveRoot(), settings.unpackDrm());
                     try {
                         plans.add(new GamePlan(r, Optional.of(CrackJob.plan(req)), ""));
                     } catch (Exception e) {
@@ -420,7 +422,7 @@ public class LibraryController implements Page {
 
     private boolean confirmBatch(List<GamePlan> plans, BatchJob.Settings settings) {
         List<String> lines = new ArrayList<>();
-        long totalSize = 0, toPatch = 0;
+        long totalSize = 0, toPatch = 0, stubGames = 0;
         for (GamePlan p : plans) {
             String line = p.row().name() + "  ·  ";
             if (p.plan().isEmpty()) {
@@ -432,13 +434,21 @@ public class LibraryController implements Page {
                 if (plan.dlls().isEmpty()) line += "no steam_api DLLs, skipped";
                 else if (plan.toPatch() == 0) line += "already up to date";
                 else line += plan.toPatch() + " DLL(s)" + (plan.upToDate() > 0 ? ", " + plan.upToDate() + " already up to date" : "");
+                if (!plan.stubExes().isEmpty() && !plan.dlls().isEmpty()) {
+                    stubGames++;
+                    line += plan.unpackDrm() ? "  ·  unpack " + plan.stubExes().size() + " exe"
+                            : "  ·  " + plan.stubExes().size() + " exe with SteamStub DRM (unpacking is off)";
+                }
                 if (plan.problem().isPresent()) line += "\n⚠ " + plan.problem().get();
             }
             lines.add(line);
         }
 
         String message = toPatch + " DLL(s) will be replaced. "
-                + (settings.backupDlls() ? "The originals are kept as .bak files." : "The originals are NOT kept, .bak is off.");
+                + (settings.emulator().isProxy() ? "The originals stay beside " + settings.emulator() + " as steam_api(64)_o.dll."
+                : settings.backupDlls() ? "The originals are kept as .bak files." : "The originals are NOT kept, .bak is off.");
+        if (settings.unpackDrm() && stubGames > 0)
+            message += " SteamStub DRM is removed from the executables of " + games(stubGames) + " (originals kept as .steamstub.bak).";
         if (settings.backupRoot().isPresent())
             message += " Each game is copied to " + settings.backupRoot().get() + " first (" + FileOps.formatSize(totalSize) + " in total).";
         if (settings.moveRoot().isPresent()) message += " Afterwards they're moved to " + settings.moveRoot().get() + ".";

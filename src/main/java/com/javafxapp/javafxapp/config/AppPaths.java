@@ -18,6 +18,8 @@ public final class AppPaths {
     public static Path home()      { return HOME; }
     public static Path emulators() { return HOME.resolve("emulators"); }
     public static Path logs()      { return HOME.resolve("logs"); }
+    /** Helper programs Lumina downloads and runs, such as Steamless. */
+    public static Path tools()     { return HOME.resolve("tools"); }
 
     public static Path legacyDependencies() {
         return Path.of(System.getProperty("user.dir"), "dependencies");

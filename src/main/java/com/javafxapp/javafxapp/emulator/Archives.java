@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -26,15 +27,20 @@ final class Archives {
     private Archives() {}
 
     static void extractSteamApi(Path archive, Format format, Path targetDir) throws IOException {
-        Files.createDirectories(targetDir);
-        if (format == Format.ZIP) extractZip(archive, targetDir);
-        else extract7z(archive, targetDir);
+        extractSteamApi(archive, format, targetDir, Function.identity());
     }
 
-    private static void extractZip(Path archive, Path targetDir) throws IOException {
+    /** @param archiveName maps steam_api.dll / steam_api64.dll to the file that replaces it inside the archive */
+    static void extractSteamApi(Path archive, Format format, Path targetDir, Function<String, String> archiveName) throws IOException {
+        Files.createDirectories(targetDir);
+        if (format == Format.ZIP) extractZip(archive, targetDir, archiveName);
+        else extract7z(archive, targetDir, archiveName);
+    }
+
+    private static void extractZip(Path archive, Path targetDir, Function<String, String> archiveName) throws IOException {
         try (ZipFile zip = new ZipFile(archive.toFile())) {
             List<String> names = zip.stream().filter(e -> !e.isDirectory()).map(ZipEntry::getName).toList();
-            for (Map.Entry<String, String> pick : choose(names).entrySet()) {
+            for (Map.Entry<String, String> pick : choose(names, archiveName).entrySet()) {
                 try (InputStream in = zip.getInputStream(zip.getEntry(pick.getValue()))) {
                     Files.copy(in, targetDir.resolve(pick.getKey()), StandardCopyOption.REPLACE_EXISTING);
                 }
@@ -42,19 +48,19 @@ final class Archives {
         }
     }
 
-    private static void extract7z(Path archive, Path targetDir) throws IOException {
+    private static void extract7z(Path archive, Path targetDir, Function<String, String> archiveName) throws IOException {
         try {
-            extract7zInJava(archive, targetDir);
+            extract7zInJava(archive, targetDir, archiveName);
         } catch (IOException | RuntimeException e) {
             // the java library can't read every 7z (gbe_fork's use a multi-stream filter), windows' tar can
             Log.info("7z extraction in Java failed (" + e.getMessage() + "), trying tar");
-            extract7zWithTar(archive, targetDir);
+            extract7zWithTar(archive, targetDir, archiveName);
         }
     }
 
-    private static void extract7zWithTar(Path archive, Path targetDir) throws IOException {
+    private static void extract7zWithTar(Path archive, Path targetDir, Function<String, String> archiveName) throws IOException {
         List<String> names = tar("-tf", archive.toString()).lines().filter(n -> !n.endsWith("/")).toList();
-        Map<String, String> picks = choose(names);
+        Map<String, String> picks = choose(names, archiveName);
         Path work = Files.createTempDirectory(targetDir, "tar-");
         try {
             List<String> args = new ArrayList<>(List.of("-xf", archive.toString(), "-C", work.toString()));
@@ -88,12 +94,12 @@ final class Archives {
         }
     }
 
-    private static void extract7zInJava(Path archive, Path targetDir) throws IOException {
+    private static void extract7zInJava(Path archive, Path targetDir, Function<String, String> archiveName) throws IOException {
         Map<String, String> picks;
         try (SevenZFile sz = new SevenZFile(archive.toFile())) {
             List<String> names = new ArrayList<>();
             for (SevenZArchiveEntry e : sz.getEntries()) if (!e.isDirectory()) names.add(e.getName());
-            picks = choose(names);
+            picks = choose(names, archiveName);
         }
         Map<String, String> byEntry = new HashMap<>();
         picks.forEach((dll, entry) -> byEntry.put(entry, dll));
@@ -113,12 +119,18 @@ final class Archives {
     }
 
     static Map<String, String> choose(Collection<String> entryNames) throws IOException {
+        return choose(entryNames, Function.identity());
+    }
+
+    /** For each steam_api DLL name, the archive entry that replaces it. The keys are the names the DLLs are stored under. */
+    static Map<String, String> choose(Collection<String> entryNames, Function<String, String> archiveName) throws IOException {
         Map<String, String> picks = new LinkedHashMap<>();
         for (String dll : SteamApi.DLL_NAMES) {
+            String wanted = archiveName.apply(dll);
             String best = entryNames.stream()
-                    .filter(n -> fileName(n).equalsIgnoreCase(dll))
+                    .filter(n -> fileName(n).equalsIgnoreCase(wanted))
                     .min(Comparator.comparingInt(Archives::score))
-                    .orElseThrow(() -> new IOException("Archive does not contain " + dll));
+                    .orElseThrow(() -> new IOException("Archive does not contain " + wanted));
             picks.put(dll, best);
         }
         return picks;

@@ -39,6 +39,7 @@ public class LuminaApp extends Application {
     @Override
     public void init() {
         EmulatorInstaller.migrateLegacyInstall();
+        com.javafxapp.javafxapp.unpack.Steamless.recover();
         Theme.load();
     }
 

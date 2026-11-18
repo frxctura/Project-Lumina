@@ -21,9 +21,10 @@ public final class DefenderPrompt {
 
     private DefenderPrompt() {}
 
-    // before patching with gbe_fork: asks once per game folder, then calls next whatever the answer was
-    public static void offer(AppShell shell, Emulator emulator, List<Path> gameDirs, Runnable next) {
-        if (emulator != Emulator.GBE_FORK) {
+    // before patching with gbe_fork, or with DRM unpacking on (Steamless gets flagged too):
+    // asks once per game folder, then calls next whatever the answer was
+    public static void offer(AppShell shell, Emulator emulator, List<Path> gameDirs, boolean unpackDrm, Runnable next) {
+        if (emulator != Emulator.GBE_FORK && !unpackDrm) {
             next.run();
             return;
         }
@@ -34,10 +35,11 @@ public final class DefenderPrompt {
         }
         fresh.forEach(AppSettings::markAskedAboutDefender);
 
-        List<Path> folders = withEmulators(fresh);
+        List<Path> folders = withEmulators(fresh, unpackDrm);
+        String flagged = emulator == Emulator.GBE_FORK ? (unpackDrm ? "gbe_fork's DLLs and Steamless" : "gbe_fork's DLLs") : "Steamless";
         boolean add = Ui.prompt(shell.window())
                 .title("Add a Defender exclusion first?")
-                .message("Defender often quarantines gbe_fork's DLLs. Excluding the folders they go into stops that.")
+                .message("Defender often quarantines " + flagged + ". Excluding the folders they go into stops that.")
                 .details(paths(folders))
                 .note("Windows will ask for administrator permission. Lumina only asks once per game.")
                 .confirm("ADD EXCLUSION").cancel("SKIP")
@@ -50,7 +52,7 @@ public final class DefenderPrompt {
     // the button in the library: any games, any emulator, whenever you like
     public static void addFor(AppShell shell, List<Path> gameDirs) {
         if (gameDirs.isEmpty()) return;
-        List<Path> folders = withEmulators(gameDirs);
+        List<Path> folders = withEmulators(gameDirs, true);
         boolean add = Ui.prompt(shell.window())
                 .title("Exclude these folders from Defender?")
                 .message("Defender stops scanning them, so it can't quarantine the emulator DLLs.")
@@ -69,6 +71,7 @@ public final class DefenderPrompt {
             @Override
             protected Void call() throws Exception {
                 Files.createDirectories(AppPaths.emulators());
+                if (folders.contains(AppPaths.tools())) Files.createDirectories(AppPaths.tools());
                 DefenderExclusion.add(folders);
                 return null;
             }
@@ -87,9 +90,10 @@ public final class DefenderPrompt {
         Ui.start(task, "defender-exclusion");
     }
 
-    private static List<Path> withEmulators(List<Path> gameDirs) {
+    private static List<Path> withEmulators(List<Path> gameDirs, boolean withTools) {
         List<Path> folders = new ArrayList<>(gameDirs);
         folders.add(AppPaths.emulators());
+        if (withTools) folders.add(AppPaths.tools());
         return folders;
     }
 

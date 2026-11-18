@@ -32,6 +32,42 @@ class EmulatorConfigTest {
     }
 
     @Test
+    void smokeApiUnlocksByDefaultAndKeepsExtraDlcPerApp() throws Exception {
+        assertTrue(EmulatorConfig.load(dir, Emulator.SMOKEAPI, "480").unlockAllDlc()); // no file yet: SmokeAPI's own default
+
+        EmulatorConfig config = new EmulatorConfig("", "", "", false, false, List.of(new EmulatorConfig.Dlc("1001", "Soundtrack")));
+        config.save(dir, Emulator.SMOKEAPI, "480");
+        EmulatorConfig loaded = EmulatorConfig.load(dir, Emulator.SMOKEAPI, "480");
+        assertFalse(loaded.unlockAllDlc());
+        assertEquals(config.dlcs(), loaded.dlcs());
+        assertEquals(List.of(), EmulatorConfig.load(dir, Emulator.SMOKEAPI, "999").dlcs()); // another game's entry is separate
+
+        String json = Files.readString(dir.resolve("SmokeAPI.config.json"));
+        assertTrue(json.contains("\"logging\": false"), "the packaged config logs everything; ours must not");
+        assertTrue(json.contains("\"original\""));
+    }
+
+    @Test
+    void smokeApiKeepsFieldsLuminaDoesNotEdit() throws Exception {
+        Files.writeString(dir.resolve("SmokeAPI.config.json"),
+                "{\"$version\": 4, \"logging\": true, \"override_dlc_status\": {\"7\": \"locked\"}, \"extra_dlcs\": {\"111\": {\"dlcs\": {\"5\": \"Other game\"}}}}");
+        new EmulatorConfig("", "", "", false, true, List.of(new EmulatorConfig.Dlc("1001", "New"))).save(dir, Emulator.SMOKEAPI, "480");
+
+        String json = Files.readString(dir.resolve("SmokeAPI.config.json"));
+        assertTrue(json.contains("\"logging\": true"));
+        assertTrue(json.contains("\"override_dlc_status\""));
+        assertTrue(json.contains("Other game"));
+        assertEquals(List.of(new EmulatorConfig.Dlc("5", "Other game")), EmulatorConfig.load(dir, Emulator.SMOKEAPI, "111").dlcs());
+    }
+
+    @Test
+    void smokeApiNeedsAnAppIdToStoreExtraDlc() {
+        EmulatorConfig config = new EmulatorConfig("", "", "", false, true, List.of(new EmulatorConfig.Dlc("1001", "x")));
+        assertThrows(java.io.IOException.class, () -> config.save(dir, Emulator.SMOKEAPI, ""));
+        assertDoesNotThrow(() -> EmulatorConfig.empty().save(dir, Emulator.SMOKEAPI, "")); // nothing to store, so nothing is needed
+    }
+
+    @Test
     void goldbergBlankValuesRemoveFiles() throws Exception {
         SAMPLE.save(dir, Emulator.GOLDBERG);
         EmulatorConfig.empty().save(dir, Emulator.GOLDBERG);

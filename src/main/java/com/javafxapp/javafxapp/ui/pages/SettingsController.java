@@ -9,6 +9,7 @@ import com.javafxapp.javafxapp.config.AppSettings;
 import com.javafxapp.javafxapp.safety.DefenderExclusion;
 import com.javafxapp.javafxapp.emulator.Emulator;
 import com.javafxapp.javafxapp.emulator.EmulatorInstaller;
+import com.javafxapp.javafxapp.unpack.Steamless;
 import com.javafxapp.javafxapp.ui.components.Toaster;
 import com.javafxapp.javafxapp.ui.shell.AppShell;
 import com.javafxapp.javafxapp.ui.shell.Page;
@@ -49,7 +50,10 @@ public class SettingsController implements Page {
     private final DoubleProperty downloadProgress = new SimpleDoubleProperty(-1);
     private final StringProperty downloadText = new SimpleStringProperty("");
 
-    @FXML private VBox settingsContainer, emulatorList;
+    private boolean downloadingSteamless;
+
+    @FXML private VBox settingsContainer, emulatorList, toolList;
+    @FXML private CheckBox unpackDrmCheckbox;
     @FXML private Label moveDirLabel, backupDirLabel, appDataLabel;
     @FXML private Button selectMoveDir, openMoveDir, selectBackupDir, openBackupDir;
     @FXML private Button openAppData, openLogsButton, clearRecentButton, resetSettings, excludeEmulatorsButton;
@@ -65,6 +69,7 @@ public class SettingsController implements Page {
             shell.setStatus("Logging to file " + (logToFileCheckbox.isSelected() ? "enabled" : "disabled"));
         });
         previewCheckbox.setOnAction(e -> AppSettings.setPreviewBeforePatch(previewCheckbox.isSelected()));
+        unpackDrmCheckbox.setOnAction(e -> AppSettings.setUnpackDrm(unpackDrmCheckbox.isSelected()));
         moveGameDirCheckbox.setOnAction(e -> {
             AppSettings.setMoveGameDir(moveGameDirCheckbox.isSelected());
             refresh();
@@ -104,10 +109,11 @@ public class SettingsController implements Page {
 
     private void excludeEmulators() {
         Path dir = AppPaths.emulators();
+        Path tools = AppPaths.tools();
         if (!Ui.prompt(shell.window())
-                .title("Exclude the emulator folder from Defender?")
-                .message("Defender stops scanning it, so it can't quarantine the emulator DLLs Lumina keeps there.")
-                .details(java.util.List.of(dir.toString()))
+                .title("Exclude the emulator and tools folders from Defender?")
+                .message("Defender stops scanning them, so it can't quarantine the emulator DLLs and Steamless that Lumina keeps there.")
+                .details(java.util.List.of(dir.toString(), tools.toString()))
                 .note("Windows will ask for administrator permission.")
                 .confirm("ADD EXCLUSION").width(520)
                 .ask()) return;
@@ -117,7 +123,8 @@ public class SettingsController implements Page {
             @Override
             protected Void call() throws Exception {
                 java.nio.file.Files.createDirectories(dir);
-                DefenderExclusion.add(java.util.List.of(dir));
+                java.nio.file.Files.createDirectories(tools);
+                DefenderExclusion.add(java.util.List.of(dir, tools));
                 return null;
             }
         };
@@ -173,12 +180,110 @@ public class SettingsController implements Page {
         moveGameDirCheckbox.setSelected(AppSettings.isMoveGameDir());
         backupGameDirCheckbox.setSelected(AppSettings.isBackupGameDir());
         previewCheckbox.setSelected(AppSettings.isPreviewBeforePatch());
+        unpackDrmCheckbox.setSelected(AppSettings.isUnpackDrm());
 
         showPath(moveDirLabel, selectMoveDir, openMoveDir, AppSettings.getMoveGameDirPath(), AppSettings.isMoveGameDir());
         showPath(backupDirLabel, selectBackupDir, openBackupDir, AppSettings.getBackupGameDirPath(), AppSettings.isBackupGameDir());
 
         emulatorList.getChildren().clear();
         for (Emulator emulator : Emulator.values()) emulatorList.getChildren().add(emulatorRow(emulator));
+        toolList.getChildren().setAll(steamlessRow());
+    }
+
+    private boolean downloadBusy() {
+        return downloading != null || downloadingSteamless;
+    }
+
+    private HBox steamlessRow() {
+        Label name = new Label("Steamless");
+        name.getStyleClass().add("emulator-name");
+        boolean installed = Steamless.isInstalled();
+        Label status = new Label(Steamless.installedVersion().map(v -> "Installed · " + v).orElse("Not installed"));
+        status.getStyleClass().addAll("badge", installed ? "badge-ok" : "badge-off");
+        Label desc = new Label("Removes SteamStub DRM from game executables. Downloaded the first time a game needs it.");
+        desc.getStyleClass().add("path-label");
+        VBox text = Layout.column("stack", Layout.row("toolbar", name, status), desc);
+
+        if (downloadingSteamless) {
+            ProgressBar bar = new ProgressBar();
+            bar.progressProperty().bind(downloadProgress);
+            bar.setMaxWidth(Double.MAX_VALUE);
+            Label detail = new Label();
+            detail.textProperty().bind(downloadText);
+            detail.getStyleClass().add("progress-detail");
+            text.getChildren().addAll(bar, detail);
+        }
+
+        Button download = new Button(installed ? "UPDATE" : "DOWNLOAD");
+        download.getStyleClass().add("secondary-button");
+        download.setOnAction(e -> downloadSteamless());
+        download.setDisable(downloadBusy());
+        Button open = new Button("OPEN");
+        open.getStyleClass().add("secondary-button");
+        open.setOnAction(e -> Ui.openFolder(Steamless.dir()));
+        open.setDisable(!installed);
+        Button remove = new Button("REMOVE");
+        remove.getStyleClass().add("secondary-button");
+        remove.setOnAction(e -> removeSteamless());
+        remove.setDisable(downloadBusy() || !installed);
+
+        HBox.setHgrow(text, Priority.ALWAYS);
+        return Layout.row("card compact inset toolbar", text, Layout.spacer(), download, open, remove);
+    }
+
+    private void downloadSteamless() {
+        downloadingSteamless = true;
+        downloadProgress.set(-1);
+        downloadText.set("Connecting…");
+        shell.setNavigationLocked(true);
+        refresh();
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                long start = System.nanoTime();
+                Steamless.install((m, err) -> Platform.runLater(() -> downloadText.set(m)), (done, total) -> {
+                    double secs = Math.max((System.nanoTime() - start) / 1e9, 0.001);
+                    String text = FileOps.formatSize(done) + (total > 0 ? " of " + FileOps.formatSize(total) : "")
+                            + "  ·  " + FileOps.formatSize((long) (done / secs)) + "/s";
+                    Platform.runLater(() -> {
+                        downloadProgress.set(total > 0 ? (double) done / total : -1);
+                        downloadText.set(text);
+                    });
+                });
+                return null;
+            }
+        };
+        Runnable done = () -> {
+            downloadingSteamless = false;
+            shell.setNavigationLocked(false);
+            refresh();
+        };
+        task.setOnSucceeded(e -> {
+            done.run();
+            shell.toast(Toaster.Kind.SUCCESS, "Steamless " + Steamless.installedVersion().orElse("") + " is ready.");
+        });
+        task.setOnFailed(e -> {
+            done.run();
+            Log.error("Steamless download failed", task.getException());
+            shell.toast(Toaster.Kind.ERROR, "Steamless download failed: " + Errors.describe(task.getException()));
+        });
+        Ui.start(task, "steamless-download");
+    }
+
+    private void removeSteamless() {
+        if (!Ui.prompt(shell.window())
+                .title("Remove Steamless?")
+                .message("It's downloaded again the next time a patch needs it. Games you already unpacked aren't affected.")
+                .confirm("REMOVE").destructive()
+                .ask()) return;
+        try {
+            Steamless.uninstall();
+            shell.toast(Toaster.Kind.INFO, "Steamless removed.");
+        } catch (IOException e) {
+            shell.toast(Toaster.Kind.ERROR, "Could not remove Steamless: " + Errors.describe(e));
+        }
+        refresh();
     }
 
     private HBox emulatorRow(Emulator emulator) {
@@ -203,7 +308,7 @@ public class SettingsController implements Page {
         Button download = new Button(emulator.isInstalled() ? "UPDATE" : "DOWNLOAD");
         download.getStyleClass().add("secondary-button");
         download.setOnAction(e -> download(emulator));
-        download.setDisable(downloading != null);
+        download.setDisable(downloadBusy());
         Button open = new Button("OPEN");
         open.getStyleClass().add("secondary-button");
         open.setOnAction(e -> Ui.openFolder(emulator.dir()));
@@ -211,7 +316,7 @@ public class SettingsController implements Page {
         Button remove = new Button("REMOVE");
         remove.getStyleClass().add("secondary-button");
         remove.setOnAction(e -> remove(emulator));
-        remove.setDisable(downloading != null || !emulator.isInstalled());
+        remove.setDisable(downloadBusy() || !emulator.isInstalled());
 
         HBox.setHgrow(text, Priority.ALWAYS);
         return Layout.row("card compact inset toolbar", text, Layout.spacer(), download, open, remove);

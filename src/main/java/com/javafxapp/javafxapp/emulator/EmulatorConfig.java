@@ -1,5 +1,7 @@
 package com.javafxapp.javafxapp.emulator;
 
+import com.javafxapp.javafxapp.common.Json;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,13 +28,74 @@ public record EmulatorConfig(String username, String steamId, String language, b
     }
 
     public static EmulatorConfig load(Path settingsDir, Emulator emulator) throws IOException {
-        return emulator == Emulator.GBE_FORK ? loadGbe(settingsDir) : loadGoldberg(settingsDir);
+        return load(settingsDir, emulator, "");
+    }
+
+    /** @param appId the game's Steam App ID; SmokeAPI keeps its extra DLC under it */
+    public static EmulatorConfig load(Path settingsDir, Emulator emulator, String appId) throws IOException {
+        return switch (emulator) {
+            case GBE_FORK -> loadGbe(settingsDir);
+            case SMOKEAPI -> loadSmoke(settingsDir, appId);
+            case GOLDBERG -> loadGoldberg(settingsDir);
+        };
     }
 
     public void save(Path settingsDir, Emulator emulator) throws IOException {
+        save(settingsDir, emulator, "");
+    }
+
+    public void save(Path settingsDir, Emulator emulator, String appId) throws IOException {
         Files.createDirectories(settingsDir);
-        if (emulator == Emulator.GBE_FORK) saveGbe(settingsDir);
-        else saveGoldberg(settingsDir);
+        switch (emulator) {
+            case GBE_FORK -> saveGbe(settingsDir);
+            case SMOKEAPI -> saveSmoke(settingsDir, appId);
+            case GOLDBERG -> saveGoldberg(settingsDir);
+        }
+    }
+
+    // SmokeAPI: SmokeAPI.config.json next to the DLL. Fields Lumina doesn't edit are left as they are.
+
+    static final String SMOKE_FILE = "SmokeAPI.config.json";
+
+    @SuppressWarnings("unchecked")
+    private static EmulatorConfig loadSmoke(Path dir, String appId) throws IOException {
+        Path file = dir.resolve(SMOKE_FILE);
+        if (!Files.isRegularFile(file)) return new EmulatorConfig("", "", "", false, true, List.of()); // SmokeAPI unlocks by default
+        Map<String, Object> root = Json.parseObject(Files.readString(file));
+        boolean unlocked = "unlocked".equals(root.getOrDefault("default_app_status", "unlocked"));
+        List<Dlc> dlcs = new ArrayList<>();
+        if (root.get("extra_dlcs") instanceof Map<?, ?> extra && extra.get(appId) instanceof Map<?, ?> app
+                && app.get("dlcs") instanceof Map<?, ?> list) {
+            ((Map<String, Object>) list).forEach((id, name) -> dlcs.add(new Dlc(id, String.valueOf(name))));
+        }
+        return new EmulatorConfig("", "", "", false, unlocked, dlcs);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void saveSmoke(Path dir, String appId) throws IOException {
+        if (!dlcs.isEmpty() && !appId.matches("\\d{1,10}"))
+            throw new IOException("SmokeAPI keeps extra DLC under the game's App ID. Set the App ID on the main screen first.");
+        Path file = dir.resolve(SMOKE_FILE);
+        Map<String, Object> root = Files.isRegularFile(file) ? Json.parseObject(Files.readString(file)) : new LinkedHashMap<>();
+
+        root.putIfAbsent("$version", 4L);
+        root.putIfAbsent("logging", false); // the packaged default logs everything, which slows games down
+        root.put("default_app_status", unlockAllDlc ? "unlocked" : "original");
+
+        Map<String, Object> extra = root.get("extra_dlcs") instanceof Map<?, ?> m ? (Map<String, Object>) m : new LinkedHashMap<>();
+        if (appId.matches("\\d{1,10}")) {
+            if (dlcs.isEmpty()) {
+                extra.remove(appId);
+            } else {
+                Map<String, Object> list = new LinkedHashMap<>();
+                for (Dlc d : dlcs) list.put(d.appId(), d.name());
+                Map<String, Object> app = new LinkedHashMap<>();
+                app.put("dlcs", list);
+                extra.put(appId, app);
+            }
+        }
+        root.put("extra_dlcs", extra);
+        Files.writeString(file, Json.write(root));
     }
 
     // Goldberg: force_*.txt, DLC.txt, offline.txt

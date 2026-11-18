@@ -15,7 +15,7 @@
             <Button fx:id="clearButton" styleClass="secondary-button" text="CLEAR HISTORY"/>
         </HBox>
         <Label styleClass="muted" wrapText="true" minHeight="-Infinity"
-               text="Every patch and restore, and where its backups live. DLL backups (.bak) sit next to the original DLL inside the game folder; full folder copies go to the directory chosen in Settings."/>
+               text="Every patch and restore, and where its backups live. File backups (.bak, _o.dll, .steamstub.bak) sit next to the original file inside the game folder; full folder copies go to the directory chosen in Settings."/>
     </VBox>
 
     <HBox styleClass="card, compact, toolbar">

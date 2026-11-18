@@ -21,13 +21,13 @@ Backups, verification, history and batch mode included, so it doesn't turn into 
 
 <br>
 
-Lumina is a Windows app that replaces the Steam API DLLs in a game folder with a Steam emulator, either Goldberg or gbe_fork, so the game runs without the Steam client open. You can do that by hand, it's just tedious. You need the right DLLs, a backup of the originals, a memory of what you changed, and a way to undo it all when something breaks. Lumina handles that for you and keeps track of it.
+Lumina is a Windows app that replaces the Steam API DLLs in a game folder with a Steam emulator (Goldberg, gbe_fork or SmokeAPI), so the game runs without the Steam client open, or, with SmokeAPI, unlocks DLC on a game you own. You can do that by hand, it's just tedious. You need the right DLLs, a backup of the originals, a memory of what you changed, and a way to undo it all when something breaks. Lumina handles that for you and keeps track of it.
 
 Point it at a game folder, or pick a game from your Steam library, and hit start. It backs up the originals as `.bak` files, writes the emulator's DLLs over them, then reads them back to make sure they actually match. If anything goes wrong halfway, everything goes back how it was, so you never end up with a half-patched game.
 
 ## Getting started
 
-1. Grab `LuminaSetup-1.3.exe` from the [latest release](../../releases/latest) and run it.
+1. Grab `LuminaSetup-1.4.exe` from the [latest release](../../releases/latest) and run it.
 2. Open Lumina and pick a game.
 3. Hit start. The first time, it downloads the emulator itself, so there's nothing to set up.
 
@@ -41,7 +41,8 @@ Prefer building it yourself? Skip to [Building](#building).
 | **Batch mode** | Tick a few games and patch them in one run. A game that's currently running gets pushed to the end of the queue and patched once you close it. |
 | **Backups** | Keeps the original DLLs as `.bak` files, and can copy the whole game folder first if you want a clean copy to go back to. |
 | **Verify and rollback** | Every patched file is read back and checked. If one fails, everything is undone. |
-| **Two emulators** | Goldberg and gbe_fork, picked per game, with per-game settings like username, Steam ID, language, offline mode and a DLC list pulled from Steam. |
+| **Three emulators** | Goldberg, gbe_fork and SmokeAPI, picked per game, with per-game settings like username, Steam ID, language, offline mode and a DLC list pulled from Steam. |
+| **SteamStub unpacking** | Optional. Some games wrap their `.exe` in Steam's SteamStub DRM, and Lumina can remove it with [Steamless](https://github.com/atom0s/Steamless). It only touches executables that actually have the wrapper, and keeps the original. |
 | **History** | Every patch and restore, with where its backups are, how much space they take, and one-click open, restore and clean-up. |
 | **Safety checks** | Warns you if the game is running, checks you have the disk space first, and notices when antivirus eats a DLL. |
 | **Themes** | Dark, light, or follow Windows. |
@@ -66,7 +67,7 @@ Prefer building it yourself? Skip to [Building](#building).
     </td>
     <td>
       <img src="screenshots/settings.png" alt="Settings page">
-      <br><b>Settings</b><br>Themes, backup options and both emulators.
+      <br><b>Settings</b><br>Themes, backup options and the emulators.
     </td>
   </tr>
 </table>
@@ -98,18 +99,24 @@ Everything you patch or restore lands in History. From there you can open the ga
 
 Goldberg is the original, and its last release was in 2023. gbe_fork is the maintained fork. You can download, update or remove either one in Settings and pick which to use per game.
 
-Each game also gets its own emulator settings: username, Steam ID, language, offline mode, and a DLC list that Lumina can pull from Steam for you. They're written in whatever format the emulator you picked expects.
+SmokeAPI works differently from the other two. It doesn't pretend to be Steam, it only makes the game think you own its DLC, so you keep your real Steam login. Instead of overwriting the DLL it takes its place and loads the original, which stays next to it as `steam_api64_o.dll`. That file has to be there for the game to start, so Lumina always keeps it, whatever the `.bak` option says, and Restore puts it back.
+
+Each game also gets its own emulator settings: username, Steam ID, language, offline mode, and a DLC list that Lumina can pull from Steam for you. They're written in whatever format the emulator you picked expects. For SmokeAPI that's just "unlock every DLC" plus any extra DLC Steam doesn't list, in `SmokeAPI.config.json`.
+
+### SteamStub unpacking
+
+Some games wrap their `.exe` in Steam's SteamStub DRM, and swapping the DLLs isn't enough for those. Tick "Unpack SteamStub DRM" on the Home page (or in Settings) and Lumina runs Steamless on the executables that have it. The Home page also tells you how many executables in the game carry the wrapper. It spots them by reading the exe's section table, so nothing gets run on a game that doesn't need it, and Steamless itself is only downloaded the first time one does. The original is kept as `game.exe.steamstub.bak` and Restore brings it back. Steamless can't handle every SteamStub version: if it fails on one, that exe is left exactly as it was, you get told, and the DLLs are still patched.
 
 ## Good to know
 
 > [!WARNING]
 > Antivirus will probably try to eat the emulator DLLs, Defender especially, and no, that's not Lumina's fault lol. If a DLL vanishes or changes right after Lumina writes it, you get told instead of being shown a fake success.
 
-gbe_fork gets hit the hardest, so when you patch with it Lumina offers to add a Defender exclusion for the game folder (where the DLLs end up) and the emulator folder before it starts. It asks once per game, and Windows asks for admin. You can also do it yourself any time: tick games in the Library and hit "Exclude from Defender" in the queue panel, which works with either emulator.
+gbe_fork and Steamless get hit the hardest, so when you patch with either Lumina offers to add a Defender exclusion for the game folder (where the DLLs end up) and its own emulator and tools folders before it starts. It asks once per game, and Windows asks for admin. You can also do it yourself any time: tick games in the Library and hit "Exclude from Defender" in the queue panel, which works with either emulator.
 
 <p align="center"><img src="screenshots/defender.png" alt="The Defender exclusion prompt" width="460"></p>
 
-Lumina only touches the `steam_api` DLLs in the folder you give it. It searches the whole folder tree, so a game with a few copies gets all of them patched, and the rest of the game is left alone. The emulator's own files go in a `steam_settings` folder next to each DLL.
+Lumina only touches the `steam_api` DLLs in the folder you give it, plus the game's `.exe` if you turned on SteamStub unpacking and it has the wrapper. It searches the whole folder tree, so a game with a few copies gets all of them patched, and the rest of the game is left alone. The emulator's own files go in a `steam_settings` folder next to each DLL (or a `SmokeAPI.config.json` for SmokeAPI).
 
 > [!NOTE]
 > Use it on games you own, obviously.
@@ -148,7 +155,8 @@ The only thing left on the list is generating `steam_interfaces.txt` automatical
 ```
 src/main/java/com/javafxapp/javafxapp/
   patching/     patch, restore and batch jobs, patch detection
-  emulator/     downloading Goldberg and gbe_fork, per-game settings
+  emulator/     downloading Goldberg, gbe_fork and SmokeAPI, per-game settings
+  unpack/       SteamStub detection and the Steamless tool
   backup/       history, backup sizes, folder restore
   library/      Steam library scan, game info, cover cache
   safety/       running-game check, disk space, Defender exclusion

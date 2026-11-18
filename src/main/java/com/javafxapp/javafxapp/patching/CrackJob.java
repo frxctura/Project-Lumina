@@ -10,6 +10,8 @@ import com.javafxapp.javafxapp.emulator.Emulator;
 import com.javafxapp.javafxapp.emulator.EmulatorInstaller;
 import com.javafxapp.javafxapp.library.SteamStore;
 import com.javafxapp.javafxapp.safety.DiskSpace;
+import com.javafxapp.javafxapp.unpack.SteamStub;
+import com.javafxapp.javafxapp.unpack.Steamless;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -22,24 +24,38 @@ import java.util.*;
 
 public final class CrackJob extends Job<CrackJob.Result> {
 
-    public static final String DOWNLOAD = "Download", BACKUP = "Backup", SCAN = "Scan", PATCH = "Patch",
-            VERIFY = "Verify", MOVE = "Move";
+    public static final String DOWNLOAD = "Download", BACKUP = "Backup", SCAN = "Scan", UNPACK = "Unpack",
+            PATCH = "Patch", VERIFY = "Verify", MOVE = "Move";
 
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH-mm");
 
+    /** @param unpackDrm remove SteamStub DRM from the game's executables (with Steamless) before patching */
     public record Request(Path gameDir, Emulator emulator, boolean backupDlls, String appId,
-                          Optional<Path> backupRoot, Optional<Path> moveRoot) {}
+                          Optional<Path> backupRoot, Optional<Path> moveRoot, boolean unpackDrm) {
 
+        public Request(Path gameDir, Emulator emulator, boolean backupDlls, String appId,
+                       Optional<Path> backupRoot, Optional<Path> moveRoot) {
+            this(gameDir, emulator, backupDlls, appId, backupRoot, moveRoot, false);
+        }
+    }
+
+    /**
+     * @param unpacked     executables whose SteamStub DRM was removed
+     * @param unpackFailed executables Steamless could not unpack; they are left as they were and the patch carries on
+     */
     public record Result(int patched, int upToDate, int verified, int failed, boolean rolledBack, Path location,
-                         List<Path> dllBackups, Optional<Path> folderBackup, boolean antivirus) {}
+                         List<Path> dllBackups, Optional<Path> folderBackup, boolean antivirus,
+                         int unpacked, int unpackFailed) {}
 
+    /** @param stubExes executables with SteamStub DRM, found whether or not unpacking is switched on */
     public record Plan(List<PlannedDll> dlls, long gameSize, Optional<Path> folderBackup, Optional<Path> moveTo,
-                       Optional<String> problem) {
+                       Optional<String> problem, List<Path> stubExes, boolean unpackDrm) {
         public long toPatch()  { return dlls.stream().filter(d -> !d.upToDate()).count(); }
         public long upToDate() { return dlls.stream().filter(PlannedDll::upToDate).count(); }
     }
 
-    public record PlannedDll(Path dll, boolean upToDate, boolean newBackup, boolean keepsBackup) {}
+    /** @param proxy the emulator loads the original, which is moved to steam_api(64)_o.dll */
+    public record PlannedDll(Path dll, boolean upToDate, boolean newBackup, boolean keepsBackup, boolean proxy) {}
 
     private final Request req;
     private final List<String> steps = new ArrayList<>();
@@ -53,7 +69,9 @@ public final class CrackJob extends Job<CrackJob.Result> {
         this.req = request;
         if (!request.emulator().isInstalled()) steps.add(DOWNLOAD);
         if (request.backupRoot().isPresent()) steps.add(BACKUP);
-        steps.addAll(List.of(SCAN, PATCH, VERIFY));
+        steps.add(SCAN);
+        if (request.unpackDrm()) steps.add(UNPACK);
+        steps.addAll(List.of(PATCH, VERIFY));
         if (request.moveRoot().isPresent()) steps.add(MOVE);
     }
 
@@ -100,13 +118,21 @@ public final class CrackJob extends Job<CrackJob.Result> {
             List<Path> dlls = FileOps.findFiles(gameDir, SteamApi::isDll);
             if (dlls.isEmpty()) {
                 log.error("No steam_api(64).dll found in " + gameDir);
-                return new Result(0, 0, 0, 0, false, gameDir, List.of(), folderBackup, false);
+                return new Result(0, 0, 0, 0, false, gameDir, List.of(), folderBackup, false, 0, 0);
+            }
+
+            List<Path> backups = new ArrayList<>();
+            int unpacked = 0, unpackFailed = 0;
+            if (steps.contains(UNPACK)) {
+                int[] counts = unpackExecutables(gameDir, backups);
+                unpacked = counts[0];
+                unpackFailed = counts[1];
+                checkCancelled();
             }
 
             step(PATCH, "Patching " + dlls.size() + " file(s) with " + req.emulator() + "...");
             int failed = 0, upToDate = 0;
             List<Path> written = new ArrayList<>();
-            List<Path> backups = new ArrayList<>();
             for (int i = 0; i < dlls.size(); i++) {
                 checkCancelled();
                 Path dll = dlls.get(i);
@@ -144,14 +170,15 @@ public final class CrackJob extends Job<CrackJob.Result> {
                 rollBack(folderBackup);
                 updateProgress(1, 1);
                 updateMessage("Failed, changes undone");
-                return new Result(0, upToDate, 0, failed, true, gameDir, List.of(), Optional.empty(), antivirus);
+                return new Result(0, upToDate, 0, failed, true, gameDir, List.of(), Optional.empty(), antivirus, 0, 0);
             }
 
             committed = true; // verified, nothing gets undone after this
             Path location = move(gameDir, backups);
             updateProgress(1, 1);
-            updateMessage(written.isEmpty() ? "Already up to date" : "Done");
-            return new Result(written.size(), upToDate, verified, 0, false, location, backups, folderBackup, false);
+            updateMessage(written.isEmpty() && unpacked == 0 ? "Already up to date" : "Done");
+            return new Result(written.size(), upToDate, verified, 0, false, location, backups, folderBackup, false,
+                    unpacked, unpackFailed);
         } catch (Exception e) {
             if (!committed) rollBack(folderBackup);
             throw e;
@@ -180,7 +207,82 @@ public final class CrackJob extends Job<CrackJob.Result> {
         return gameDir;
     }
 
+    // Unpacking SteamStub DRM
+
+    /** Unpacks every wrapped executable. One that Steamless can't handle is left as it was; the patch carries on. */
+    private int[] unpackExecutables(Path gameDir, List<Path> backups) throws Exception {
+        step(UNPACK, "Looking for SteamStub DRM...");
+        List<Path> stubs = SteamStub.find(gameDir);
+        if (stubs.isEmpty()) {
+            log.info("No SteamStub DRM found in the game's executables.");
+            return new int[2];
+        }
+        log.info(stubs.size() + " executable(s) have SteamStub DRM.");
+        if (!Steamless.isInstalled()) {
+            updateMessage("Downloading Steamless...");
+            Steamless.install(log, slice(0.55, 0.57, "Downloading Steamless"));
+        }
+
+        int unpacked = 0, failed = 0;
+        for (int i = 0; i < stubs.size(); i++) {
+            checkCancelled();
+            updateMessage("Unpacking " + stubs.get(i).getFileName() + "  (" + (i + 1) + " of " + stubs.size() + ")");
+            if (unpack(gameDir, stubs.get(i), backups)) unpacked++;
+            else failed++;
+            updateProgress(0.57 + 0.03 * (i + 1) / stubs.size(), 1);
+        }
+        return new int[]{unpacked, failed};
+    }
+
+    private boolean unpack(Path gameDir, Path exe, List<Path> backups) throws InterruptedException {
+        Path relative = gameDir.relativize(exe);
+        Path bak = SteamApi.exeBackupOf(exe);
+        boolean madeBak = !Files.exists(bak);
+        Path unpacked = exe.resolveSibling(exe.getFileName() + ".unpacked.exe");
+        Path before = bak;
+        try {
+            if (madeBak) {
+                Files.copy(exe, bak, StandardCopyOption.COPY_ATTRIBUTES);
+            } else {
+                // an older backup is kept as it is, so the undo gets its own copy of the current file
+                before = Files.createTempFile(scratch, "exe-", ".bin");
+                Files.copy(exe, before, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.COPY_ATTRIBUTES);
+            }
+            unpacked = Steamless.unpack(exe);
+            Files.move(unpacked, exe, StandardCopyOption.REPLACE_EXISTING);
+            if (SteamStub.isProtected(exe)) throw new IOException("the executable still has SteamStub DRM afterwards");
+        } catch (InterruptedException e) {
+            abandonUnpack(before, exe, bak, madeBak, unpacked);
+            throw e;
+        } catch (IOException e) {
+            abandonUnpack(before, exe, bak, madeBak, unpacked);
+            log.error("Could not unpack " + relative + ": " + Errors.describe(e));
+            return false;
+        }
+
+        Path original = before;
+        if (madeBak) undo.push(() -> delete(bak));
+        undo.push(() -> restore(original, exe));
+        backups.add(bak);
+        log.info("Unpacked " + relative + ", original kept as " + bak.getFileName());
+        return true;
+    }
+
+    /** Puts {@code exe} back as it was and removes what this attempt created. */
+    private void abandonUnpack(Path before, Path exe, Path bak, boolean madeBak, Path unpacked) {
+        if (Files.exists(before)) restore(before, exe);
+        if (madeBak) delete(bak);
+        delete(unpacked);
+    }
+
+    // Patching
+
     private Optional<Path> patch(Path dll) throws IOException {
+        return req.emulator().isProxy() ? patchProxy(dll) : patchReplace(dll);
+    }
+
+    /** Overwrites the DLL. The original is kept as steam_api(64).dll.bak when asked for. */
+    private Optional<Path> patchReplace(Path dll) throws IOException {
         Optional<Path> backup = Optional.empty();
         if (req.backupDlls()) {
             Path bak = SteamApi.backupOf(dll);
@@ -188,7 +290,13 @@ public final class CrackJob extends Job<CrackJob.Result> {
                 log.info("Keeping existing backup " + req.gameDir().relativize(bak));
                 backup = Optional.of(bak);
             } else if (PatchDetector.isEmulatorDll(dll)) {
-                log.info("Already an emulator DLL, no original to back up: " + req.gameDir().relativize(dll));
+                Path original = SteamApi.proxyBackupOf(dll);
+                if (Files.exists(original)) {
+                    log.info("The original is kept as " + req.gameDir().relativize(original));
+                    backup = Optional.of(original);
+                } else {
+                    log.info("Already an emulator DLL, no original to back up: " + req.gameDir().relativize(dll));
+                }
             } else {
                 remember(bak);
                 Files.copy(dll, bak, StandardCopyOption.COPY_ATTRIBUTES);
@@ -203,8 +311,31 @@ public final class CrackJob extends Job<CrackJob.Result> {
         return backup;
     }
 
+    /** The emulator takes the DLL's place and loads the original, which has to stay beside it as steam_api(64)_o.dll. */
+    private Optional<Path> patchProxy(Path dll) throws IOException {
+        Path original = SteamApi.proxyBackupOf(dll);
+        if (Files.exists(original)) {
+            log.info("Keeping existing original " + req.gameDir().relativize(original));
+        } else {
+            Path bak = SteamApi.backupOf(dll);
+            Path source;
+            if (Files.exists(bak)) source = bak; // an earlier patch kept the real DLL here
+            else if (!PatchDetector.isEmulatorDll(dll)) source = dll;
+            else throw new IOException(req.gameDir().relativize(dll) + " is already an emulator DLL and no original is kept,"
+                        + " so " + req.emulator() + " would have nothing to load. Verify the game's files in Steam first.");
+            remember(original);
+            Files.copy(source, original, StandardCopyOption.COPY_ATTRIBUTES);
+            log.info("Original kept as " + req.gameDir().relativize(original));
+        }
+
+        remember(dll);
+        Files.copy(emulatorDll(dll), dll, StandardCopyOption.REPLACE_EXISTING);
+        log.info("Patched " + req.gameDir().relativize(dll));
+        return Optional.of(original);
+    }
+
     private void writeAppId(Path dll) throws IOException {
-        if (!SteamStore.isValidAppId(req.appId())) return;
+        if (!req.emulator().writesAppId() || !SteamStore.isValidAppId(req.appId())) return;
         Path appIdFile = dll.resolveSibling(SteamApi.APPID_FILE);
         remember(appIdFile);
         Files.writeString(appIdFile, req.appId());
@@ -218,11 +349,14 @@ public final class CrackJob extends Job<CrackJob.Result> {
 
     private boolean isUpToDate(Path dll) {
         try {
-            return PatchDetector.sameContent(dll, emulatorDll(dll));
+            return PatchDetector.sameContent(dll, emulatorDll(dll))
+                    && (!req.emulator().isProxy() || Files.exists(SteamApi.proxyBackupOf(dll)));
         } catch (IOException e) {
             return false;
         }
     }
+
+    // Undo
 
     private void remember(Path file) throws IOException {
         if (!remembered.add(file)) return;
@@ -272,9 +406,17 @@ public final class CrackJob extends Job<CrackJob.Result> {
     private boolean verify(Path dll) {
         Path relative = req.gameDir().relativize(dll);
         try {
-            if (PatchDetector.sameContent(dll, emulatorDll(dll))) return true;
-            antivirus = true;
-            log.error(relative + " changed after patching. Antivirus software may have altered it.");
+            if (!PatchDetector.sameContent(dll, emulatorDll(dll))) {
+                antivirus = true;
+                log.error(relative + " changed after patching. Antivirus software may have altered it.");
+                return false;
+            }
+            if (req.emulator().isProxy() && !Files.exists(SteamApi.proxyBackupOf(dll))) {
+                antivirus = true;
+                log.error(req.gameDir().relativize(SteamApi.proxyBackupOf(dll)) + " disappeared after patching. Antivirus software may have quarantined it.");
+                return false;
+            }
+            return true;
         } catch (NoSuchFileException e) {
             antivirus = true;
             log.error(relative + " disappeared after patching. Antivirus software may have quarantined it.");
@@ -288,32 +430,44 @@ public final class CrackJob extends Job<CrackJob.Result> {
         return req.emulator().dll(dll.getFileName().toString().toLowerCase());
     }
 
+    // Planning
+
     public static Plan plan(Request req) throws IOException {
         Path gameDir = req.gameDir();
         requireDirectory(gameDir);
         boolean installed = req.emulator().isInstalled();
+        boolean proxy = req.emulator().isProxy();
+        List<String> problems = new ArrayList<>();
         List<PlannedDll> dlls = new ArrayList<>();
         for (Path dll : FileOps.findFiles(gameDir, SteamApi::isDll)) {
             Path emulatorDll = req.emulator().dll(dll.getFileName().toString().toLowerCase());
-            boolean upToDate = installed && PatchDetector.sameContent(dll, emulatorDll);
+            boolean hasOriginal = Files.exists(SteamApi.proxyBackupOf(dll));
+            boolean upToDate = installed && PatchDetector.sameContent(dll, emulatorDll) && (!proxy || hasOriginal);
             boolean hasBak = Files.exists(SteamApi.backupOf(dll));
-            boolean newBak = req.backupDlls() && !upToDate && !hasBak && !PatchDetector.isEmulatorDll(dll);
-            dlls.add(new PlannedDll(dll, upToDate, newBak, hasBak));
+            if (proxy) {
+                if (!upToDate && !hasOriginal && !hasBak && PatchDetector.isEmulatorDll(dll))
+                    problems.add(gameDir.relativize(dll) + " is already an emulator DLL and no original is kept, so "
+                            + req.emulator() + " has nothing to load. Verify the game's files in Steam first.");
+                dlls.add(new PlannedDll(dll, upToDate, !upToDate && !hasOriginal, hasOriginal, true));
+            } else {
+                boolean newBak = req.backupDlls() && !upToDate && !hasBak && !PatchDetector.isEmulatorDll(dll);
+                dlls.add(new PlannedDll(dll, upToDate, newBak, hasBak, false));
+            }
         }
         String name = gameDir.getFileName().toString();
         long size = FileOps.totalSize(gameDir);
         Optional<Path> backup = req.backupRoot().map(root -> freeBackupTarget(root, name));
         Optional<Path> moveTo = req.moveRoot().map(root -> root.resolve(name));
 
-        Optional<String> problem = Optional.empty();
         if (moveTo.isPresent() && Files.exists(moveTo.get()))
-            problem = Optional.of("The move target already exists, so the game will stay where it is: " + moveTo.get());
+            problems.add("The move target already exists, so the game will stay where it is: " + moveTo.get());
         try {
             checkSpace(req, size);
         } catch (IOException e) {
-            problem = Optional.of(Errors.describe(e));
+            problems.add(Errors.describe(e));
         }
-        return new Plan(dlls, size, backup, moveTo, problem);
+        Optional<String> problem = problems.isEmpty() ? Optional.empty() : Optional.of(String.join("\n", problems));
+        return new Plan(dlls, size, backup, moveTo, problem, SteamStub.find(gameDir), req.unpackDrm());
     }
 
     static Path freeBackupTarget(Path root, String name) {

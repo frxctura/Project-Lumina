@@ -195,7 +195,7 @@ public class HistoryController implements Page {
         summaryLabel.setText(t.backups() == 0 ? "No backups on disk"
                 : t.backups() + (t.backups() == 1 ? " backup" : " backups")
                 + "  ·  " + (t.complete() ? FileOps.formatSize(t.folderBytes()) : "measuring...") + " used by folder copies"
-                + "  ·  " + FileOps.formatSize(t.bakBytes()) + " in .bak files");
+                + "  ·  " + FileOps.formatSize(t.bakBytes()) + " in backup files");
 
         String backupDir = AppSettings.getBackupGameDirPath();
         openBackupFolderButton.setDisable(backupDir.isBlank() || !Files.isDirectory(Path.of(backupDir)));
@@ -213,7 +213,7 @@ public class HistoryController implements Page {
         Path folder = entry.folderBackup().orElseThrow();
         String size = card.stats.sizeKnown() ? FileOps.formatSize(card.stats.folderBytes()) : "unknown size";
         if (!Ui.prompt(shell.window()).title("Delete the folder backup of " + entry.game() + "?")
-                .message("This frees " + size + ". The .bak files inside the game folder are kept, so you can still put the original DLLs back.")
+                .message("This frees " + size + ". The backup files inside the game folder (.bak, _o.dll) are kept, so you can still put the originals back.")
                 .details(List.of(folder.toString()))
                 .confirm("DELETE BACKUP").destructive().width(520).ask()) return;
 
@@ -252,7 +252,7 @@ public class HistoryController implements Page {
                 .title("Clean up folder backups")
                 .message("Pick a rule, and you'll see what it frees before anything is deleted.")
                 .extra(choices, preview)
-                .note(".bak files are never deleted here, they're the only way back to the original DLLs.")
+                .note("The backup files inside game folders (.bak, _o.dll, .steamstub.bak) are never deleted here, they're the only way back to the originals.")
                 .confirm("DELETE").destructive().width(500);
         Node deleteButton = dialog.confirmButton();
 
@@ -529,6 +529,7 @@ public class HistoryController implements Page {
             String summary;
             if (entry.action() == HistoryEntry.Action.PATCH)
                 summary = entry.emulator() + "  ·  " + entry.files() + " file(s) patched"
+                        + (entry.unpacked() > 0 ? "  ·  " + entry.unpacked() + " exe unpacked" : "")
                         + (entry.failed() > 0 ? "  ·  " + entry.failed() + " failed" : "");
             else if (entry.isFolderRestore())
                 summary = "Whole folder restored from backup  ·  " + entry.files() + " file(s)";
@@ -547,10 +548,10 @@ public class HistoryController implements Page {
             if (entry.action() == HistoryEntry.Action.PATCH) {
                 int listed = entry.dllBackups().size();
                 String baks = listed == 0 ? "Not kept (backup option was off)"
-                        : listed + " .bak file(s) next to the original DLLs"
+                        : listed + (listed == 1 ? " file" : " files") + " next to the originals"
                         + (stats.baksPresent() < listed ? "  ·  " + stats.baksPresent() + " still present" : "")
                         + (stats.baksPresent() > 0 ? "  ·  " + FileOps.formatSize(stats.bakBytes()) : "");
-                addLocation(grid, row++, "DLL backups", baks, listed == 0 || stats.baksPresent() > 0);
+                addLocation(grid, row++, "File backups", baks, listed == 0 || stats.baksPresent() > 0);
                 if (entry.folderBackup().isPresent())
                     addLocation(grid, row, "Folder copy", entry.folderBackup().get()
                             + (stats.folderExists() ? "  ·  " + size(stats) : ""), stats.folderExists());
@@ -570,7 +571,7 @@ public class HistoryController implements Page {
             }
             if (stats.baksPresent() > 0)
                 entry.dllBackups().stream().filter(Files::exists).findFirst()
-                        .ifPresent(bak -> left.getChildren().add(button("SHOW .BAK", () -> Ui.showInExplorer(bak))));
+                        .ifPresent(bak -> left.getChildren().add(button("SHOW BACKUP", () -> Ui.showInExplorer(bak))));
             if (stats.folderExists())
                 left.getChildren().add(button("FOLDER BACKUP", () -> Ui.openFolder(entry.folderBackup().get())));
             if (entry.ownsFolderBackup() && stats.folderExists()) {
@@ -578,7 +579,7 @@ public class HistoryController implements Page {
                 restore.setTooltip(new Tooltip("Replace the game folder with this full copy"));
                 Button delete = button("DELETE FOLDER BACKUP", () -> deleteFolderBackup(this));
                 delete.getStyleClass().add("danger-text");
-                delete.setTooltip(new Tooltip("Free " + size(stats) + ". The .bak files are kept."));
+                delete.setTooltip(new Tooltip("Free " + size(stats) + ". The backup files in the game folder are kept."));
                 restore.setDisable(busy);
                 delete.setDisable(busy);
                 left.getChildren().addAll(restore, delete);

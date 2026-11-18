@@ -56,8 +56,19 @@
             <HBox styleClass="toolbar">
                 <Button fx:id="excludeEmulatorsButton" styleClass="secondary-button" text="EXCLUDE FROM DEFENDER"/>
                 <Label styleClass="path-label" wrapText="true" HBox.hgrow="ALWAYS" maxWidth="Infinity"
-                       text="Stops Microsoft Defender from quarantining the emulator DLLs Lumina keeps. Needs administrator permission."/>
+                       text="Stops Microsoft Defender from quarantining the emulator DLLs and Steamless that Lumina keeps. Needs administrator permission."/>
             </HBox>
+        </VBox>
+
+        <VBox styleClass="card">
+            <VBox styleClass="stack">
+                <Label styleClass="section-label" text="DRM UNPACKING"/>
+                <Label styleClass="path-label" wrapText="true" minHeight="-Infinity"
+                       text="Some games wrap their .exe in Steam's SteamStub DRM. Steamless removes it, and only runs on games that have it. The original .exe is kept as .exe.steamstub.bak and comes back with Restore."/>
+            </VBox>
+            <CheckBox fx:id="unpackDrmCheckbox" styleClass="app-check"
+                      text="Unpack SteamStub DRM when patching"/>
+            <VBox fx:id="toolList" styleClass="gap-2"/>
         </VBox>
 
         <VBox styleClass="card">

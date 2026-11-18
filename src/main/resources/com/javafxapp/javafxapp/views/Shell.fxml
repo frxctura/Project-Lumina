@@ -37,7 +37,7 @@
 
     <bottom>
         <HBox alignment="CENTER_LEFT" styleClass="status-bar">
-            <Label styleClass="status-version" text="Lumina 1.4"/>
+            <Label fx:id="versionLabel" styleClass="status-version" text="Lumina"/>
             <Region fx:id="activityDot" styleClass="activity-dot" visible="false" managed="false"/>
             <Label fx:id="statusLabel" styleClass="status-text"/>
             <Region HBox.hgrow="ALWAYS"/>

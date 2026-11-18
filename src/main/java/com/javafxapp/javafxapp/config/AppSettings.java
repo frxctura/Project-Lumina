@@ -96,7 +96,23 @@ public final class AppSettings {
         String key = dir.toAbsolutePath().normalize().toString();
         if (asked.contains(key)) return;
         asked.add(key);
-        PREFS.put(DEFENDER_ASKED, String.join("\n", asked.subList(Math.max(0, asked.size() - 100), asked.size())));
+        PREFS.put(DEFENDER_ASKED, String.join("\n", newest(asked, 100, MAX_PREF_CHARS)));
+    }
+
+    // a registry-backed preference holds at most Preferences.MAX_VALUE_LENGTH (8192) characters, and put() throws beyond it
+    private static final int MAX_PREF_CHARS = 8000;
+
+    /** The last {@code maxItems} entries of {@code items} that still fit in {@code maxChars} once joined with newlines. */
+    static List<String> newest(List<String> items, int maxItems, int maxChars) {
+        List<String> kept = new ArrayList<>();
+        int chars = 0;
+        for (int i = items.size() - 1; i >= 0 && kept.size() < maxItems; i--) {
+            int added = items.get(i).length() + (kept.isEmpty() ? 0 : 1);
+            if (chars + added > maxChars) break;
+            chars += added;
+            kept.add(0, items.get(i));
+        }
+        return kept;
     }
 
     private static List<String> askedFolders() {

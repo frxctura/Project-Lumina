@@ -84,6 +84,7 @@ public final class CrackJob extends Job<CrackJob.Result> {
     protected Result call() throws Exception {
         Path gameDir = req.gameDir();
         requireDirectory(gameDir);
+        checkTargets(req);
         updateProgress(-1, 1);
         if (req.backupRoot().isPresent() || req.moveRoot().isPresent()) {
             updateMessage("Checking free space...");
@@ -96,11 +97,18 @@ public final class CrackJob extends Job<CrackJob.Result> {
         }
         checkCancelled();
 
+        // look before copying anything: a game with nothing to change shouldn't be copied for nothing
+        List<Path> dlls = FileOps.findFiles(gameDir, SteamApi::isDll);
+        List<Path> stubs = req.unpackDrm() && !dlls.isEmpty() ? SteamStub.find(gameDir) : List.of();
+        boolean changes = !stubs.isEmpty() || dlls.stream().anyMatch(d -> !isUpToDate(d));
+
         Optional<Path> folderBackup = Optional.empty();
         Files.createDirectories(AppPaths.emulators());
         scratch = Files.createTempDirectory(AppPaths.emulators(), "undo-");
         try {
-            if (req.backupRoot().isPresent()) {
+            if (req.backupRoot().isPresent() && !changes) {
+                log.info("Nothing to change, so the folder backup is skipped.");
+            } else if (req.backupRoot().isPresent()) {
                 Path target = freeBackupTarget(req.backupRoot().get(), gameDir.getFileName().toString());
                 step(BACKUP, "Backing up game directory...");
                 try {
@@ -115,7 +123,6 @@ public final class CrackJob extends Job<CrackJob.Result> {
             checkCancelled();
 
             step(SCAN, "Scanning for steam_api DLLs...");
-            List<Path> dlls = FileOps.findFiles(gameDir, SteamApi::isDll);
             if (dlls.isEmpty()) {
                 log.error("No steam_api(64).dll found in " + gameDir);
                 return new Result(0, 0, 0, 0, false, gameDir, List.of(), folderBackup, false, 0, 0);
@@ -124,7 +131,7 @@ public final class CrackJob extends Job<CrackJob.Result> {
             List<Path> backups = new ArrayList<>();
             int unpacked = 0, unpackFailed = 0;
             if (steps.contains(UNPACK)) {
-                int[] counts = unpackExecutables(gameDir, backups);
+                int[] counts = unpackExecutables(gameDir, stubs, backups);
                 unpacked = counts[0];
                 unpackFailed = counts[1];
                 checkCancelled();
@@ -210,9 +217,8 @@ public final class CrackJob extends Job<CrackJob.Result> {
     // Unpacking SteamStub DRM
 
     /** Unpacks every wrapped executable. One that Steamless can't handle is left as it was; the patch carries on. */
-    private int[] unpackExecutables(Path gameDir, List<Path> backups) throws Exception {
+    private int[] unpackExecutables(Path gameDir, List<Path> stubs, List<Path> backups) throws Exception {
         step(UNPACK, "Looking for SteamStub DRM...");
-        List<Path> stubs = SteamStub.find(gameDir);
         if (stubs.isEmpty()) {
             log.info("No SteamStub DRM found in the game's executables.");
             return new int[2];
@@ -456,18 +462,22 @@ public final class CrackJob extends Job<CrackJob.Result> {
         }
         String name = gameDir.getFileName().toString();
         long size = FileOps.totalSize(gameDir);
-        Optional<Path> backup = req.backupRoot().map(root -> freeBackupTarget(root, name));
+        List<Path> stubs = SteamStub.find(gameDir);
+        // the job skips the folder copy when it has nothing to change, so the preview doesn't promise one
+        boolean changes = dlls.stream().anyMatch(d -> !d.upToDate()) || (req.unpackDrm() && !stubs.isEmpty() && !dlls.isEmpty());
+        Optional<Path> backup = changes ? req.backupRoot().map(root -> freeBackupTarget(root, name)) : Optional.empty();
         Optional<Path> moveTo = req.moveRoot().map(root -> root.resolve(name));
 
         if (moveTo.isPresent() && Files.exists(moveTo.get()))
             problems.add("The move target already exists, so the game will stay where it is: " + moveTo.get());
         try {
+            checkTargets(req);
             checkSpace(req, size);
         } catch (IOException e) {
             problems.add(Errors.describe(e));
         }
         Optional<String> problem = problems.isEmpty() ? Optional.empty() : Optional.of(String.join("\n", problems));
-        return new Plan(dlls, size, backup, moveTo, problem, SteamStub.find(gameDir), req.unpackDrm());
+        return new Plan(dlls, size, backup, moveTo, problem, stubs, req.unpackDrm());
     }
 
     static Path freeBackupTarget(Path root, String name) {
@@ -477,6 +487,19 @@ public final class CrackJob extends Job<CrackJob.Result> {
         target = root.resolve(stamped);
         for (int i = 2; Files.exists(target); i++) target = root.resolve(stamped + " " + i);
         return target;
+    }
+
+    /**
+     * A backup or move folder inside the game folder would make the copy include itself, over and over, until the
+     * path gets too long, and a game can't be moved into itself.
+     */
+    public static void checkTargets(Request req) throws IOException {
+        Path game = req.gameDir().toAbsolutePath().normalize();
+        for (var target : List.of(Map.entry("backup", req.backupRoot()), Map.entry("move", req.moveRoot()))) {
+            if (target.getValue().isPresent() && target.getValue().get().toAbsolutePath().normalize().startsWith(game))
+                throw new IOException("The " + target.getKey() + " folder " + target.getValue().get() + " is inside the game folder."
+                        + " Pick a folder outside " + game + " in Settings.");
+        }
     }
 
     public static void checkSpace(Request req, long gameSize) throws IOException {

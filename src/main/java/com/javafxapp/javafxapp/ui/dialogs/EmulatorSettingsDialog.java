@@ -5,6 +5,7 @@ import com.javafxapp.javafxapp.common.Errors;
 import com.javafxapp.javafxapp.common.Log;
 import com.javafxapp.javafxapp.emulator.Emulator;
 import com.javafxapp.javafxapp.emulator.EmulatorConfig;
+import com.javafxapp.javafxapp.emulator.SteamInterfaces;
 import com.javafxapp.javafxapp.library.SteamStore;
 import com.javafxapp.javafxapp.ui.shell.Theme;
 import com.javafxapp.javafxapp.ui.shell.Ui;
@@ -58,6 +59,9 @@ public final class EmulatorSettingsDialog {
     private final Label dlcCount = new Label();
     private final Label fetchStatus = new Label();
     private final Button fetchButton = new Button("FETCH FROM STEAM");
+    private final Label interfacesStatus = new Label();
+    private final Button generateInterfaces = new Button("GENERATE");
+    private final Button removeInterfaces = new Button("REMOVE");
     private boolean saved;
     private Task<?> fetchTask;
 
@@ -71,13 +75,13 @@ public final class EmulatorSettingsDialog {
         stage.setTitle("Emulator settings · " + game);
         stage.getIcons().setAll(((Stage) owner).getIcons());
         stage.setMinWidth(560);
-        stage.setMinHeight(480);
+        stage.setMinHeight(emulator.supportsInterfacesFile() ? 560 : 480);
 
-        VBox root = Layout.column("app-root main-area page", header(game), form(), dlcSection(), footer());
+        VBox root = Layout.column("app-root main-area page", header(game), form(), interfacesSection(), dlcSection(), footer());
         root.getStylesheets().addAll(stylesheet("styles.css"), stylesheet("main.css"));
         Theme.apply(root);
 
-        Scene scene = new Scene(root, 640, 560);
+        Scene scene = new Scene(root, 640, emulator.supportsInterfacesFile() ? 650 : 560);
         scene.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ESCAPE) stage.close(); });
         stage.setScene(scene);
         stage.setOnHidden(e -> { if (fetchTask != null) fetchTask.cancel(); });
@@ -121,6 +125,72 @@ public final class EmulatorSettingsDialog {
         grid.setVisible(emulator.supportsIdentity());
         grid.setManaged(emulator.supportsIdentity());
         return grid;
+    }
+
+    /** steam_interfaces.txt for older games. It's written straight away, it isn't part of SAVE. */
+    private VBox interfacesSection() {
+        Label title = new Label("steam_interfaces.txt");
+        title.getStyleClass().add("section-label");
+        title.setTooltip(new Tooltip("Older games ask Steam for specific interface versions, and the emulator can only answer with the "
+                + "versions the game was built for. They're read from the game's original steam_api DLL."));
+        interfacesStatus.getStyleClass().add("progress-detail");
+        interfacesStatus.setWrapText(true);
+
+        for (Button b : List.of(generateInterfaces, removeInterfaces)) b.getStyleClass().add("secondary-button");
+        generateInterfaces.setOnAction(e -> generateInterfacesFile());
+        removeInterfaces.setOnAction(e -> removeInterfacesFile());
+
+        HBox bar = Layout.row("toolbar", title, Layout.spacer(), generateInterfaces, removeInterfaces);
+        bar.setAlignment(Pos.CENTER_LEFT);
+        VBox box = Layout.column("gap-2", bar, interfacesStatus);
+        box.setVisible(emulator.supportsInterfacesFile());
+        box.setManaged(emulator.supportsInterfacesFile());
+        refreshInterfaces();
+        return box;
+    }
+
+    private void refreshInterfaces() {
+        long present = settingsDirs.stream().filter(d -> SteamInterfaces.existing(d).isPresent()).count();
+        removeInterfaces.setDisable(present == 0);
+        interfacesStatus.setTooltip(null);
+        interfacesStatus.setText(present == 0
+                ? "Not generated. Only needed if an older game won't start with the emulator."
+                : SteamInterfaces.existing(settingsDirs.get(0)).map(n -> n + " interfaces listed").orElse("Present")
+                        + (settingsDirs.size() > 1 ? " (in " + present + " of " + settingsDirs.size() + " folders)" : "") + ".");
+    }
+
+    private void generateInterfacesFile() {
+        List<String> names = List.of();
+        String error = null;
+        int written = 0;
+        for (Path dir : settingsDirs) {
+            try {
+                names = SteamInterfaces.generate(dir);
+                written++;
+            } catch (IOException e) {
+                Log.error("Could not generate steam_interfaces.txt for " + dir, e);
+                error = Errors.describe(e);
+            }
+        }
+        refreshInterfaces();
+        if (written == 0) {
+            interfacesStatus.setText(error);
+            return;
+        }
+        Log.info("Wrote steam_interfaces.txt to " + written + " folder(s)");
+        interfacesStatus.setText("Wrote " + names.size() + " interfaces" + (written > 1 ? " to " + written + " folders" : "")
+                + ". It's in place already, no need to save." + (error == null ? "" : " " + error));
+        interfacesStatus.setTooltip(new Tooltip(String.join("\n", names)));
+    }
+
+    private void removeInterfacesFile() {
+        try {
+            for (Path dir : settingsDirs) SteamInterfaces.remove(dir);
+            refreshInterfaces();
+            interfacesStatus.setText("Removed. The emulator goes back to answering with its own default versions.");
+        } catch (IOException e) {
+            interfacesStatus.setText("Could not remove it: " + Errors.describe(e));
+        }
     }
 
     private VBox dlcSection() {

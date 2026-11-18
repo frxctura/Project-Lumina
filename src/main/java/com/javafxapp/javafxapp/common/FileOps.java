@@ -3,6 +3,7 @@ package com.javafxapp.javafxapp.common;
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Predicate;
@@ -16,9 +17,31 @@ public final class FileOps {
     private FileOps() {}
 
     public static long totalSize(Path root) throws IOException {
-        try (Stream<Path> files = Files.walk(root)) {
-            return files.filter(Files::isRegularFile).mapToLong(FileOps::sizeOrZero).sum();
-        }
+        return regularFiles(root).stream().mapToLong(FileOps::sizeOrZero).sum();
+    }
+
+    /**
+     * Every regular file under {@code root}. A folder that can't be read (no permission, or one the game removes
+     * while we look) is skipped. {@code Files.walk} would throw on it, and one such folder would then make the whole
+     * game unreadable.
+     */
+    public static List<Path> regularFiles(Path root) throws IOException {
+        List<Path> files = new ArrayList<>();
+        Files.walkFileTree(root, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                if (Files.isRegularFile(file)) files.add(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException e) throws IOException {
+                if (file.equals(root)) throw e; // the folder itself is the caller's problem
+                Log.error("Skipping " + file + ": " + e);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return files;
     }
 
     public static void copyDirectory(Path source, Path target) throws IOException {
@@ -100,6 +123,8 @@ public final class FileOps {
             for (Path p : (Iterable<Path>) paths.sorted(Comparator.reverseOrder())::iterator) {
                 Files.delete(p);
             }
+        } catch (UncheckedIOException e) {
+            throw e.getCause(); // Files.walk reports a folder it can't read this way, callers expect an IOException
         }
     }
 
@@ -112,11 +137,9 @@ public final class FileOps {
     }
 
     public static List<Path> findFiles(Path root, Predicate<String> lowerCaseName) throws IOException {
-        try (Stream<Path> files = Files.walk(root)) {
-            return files.filter(Files::isRegularFile)
-                    .filter(p -> lowerCaseName.test(p.getFileName().toString().toLowerCase()))
-                    .collect(Collectors.toList());
-        }
+        return regularFiles(root).stream()
+                .filter(p -> lowerCaseName.test(p.getFileName().toString().toLowerCase()))
+                .collect(Collectors.toList());
     }
 
     public static String formatSize(long bytes) {

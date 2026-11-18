@@ -10,6 +10,7 @@ Backups, verification, history and batch mode included, so it doesn't turn into 
 ![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)
 ![Java 17+](https://img.shields.io/badge/Java-17%2B-ED8B00?logo=openjdk&logoColor=white)
 ![Release](https://img.shields.io/github/v/release/frxctura/Project-Lumina?color=7c5cff)
+[![Tests](https://github.com/frxctura/Project-Lumina/actions/workflows/test.yml/badge.svg)](https://github.com/frxctura/Project-Lumina/actions/workflows/test.yml)
 
 [Download](../../releases/latest) · [What it does](#what-it-does) · [Screenshots](#screenshots) · [Good to know](#good-to-know) · [Building](#building)
 
@@ -27,7 +28,7 @@ Point it at a game folder, or pick a game from your Steam library, and hit start
 
 ## Getting started
 
-1. Grab `LuminaSetup-1.4.exe` from the [latest release](../../releases/latest) and run it.
+1. Grab `LuminaSetup-1.5.exe` from the [latest release](../../releases/latest) and run it.
 2. Open Lumina and pick a game.
 3. Hit start. The first time, it downloads the emulator itself, so there's nothing to set up.
 
@@ -41,7 +42,7 @@ Prefer building it yourself? Skip to [Building](#building).
 | **Batch mode** | Tick a few games and patch them in one run. A game that's currently running gets pushed to the end of the queue and patched once you close it. |
 | **Backups** | Keeps the original DLLs as `.bak` files, and can copy the whole game folder first if you want a clean copy to go back to. |
 | **Verify and rollback** | Every patched file is read back and checked. If one fails, everything is undone. |
-| **Three emulators** | Goldberg, gbe_fork and SmokeAPI, picked per game, with per-game settings like username, Steam ID, language, offline mode and a DLC list pulled from Steam. |
+| **Three emulators** | Goldberg, gbe_fork and SmokeAPI, picked per game, with per-game settings like username, Steam ID, language, offline mode a DLC list pulled from Steam, and `steam_interfaces.txt` for older games. |
 | **SteamStub unpacking** | Optional. Some games wrap their `.exe` in Steam's SteamStub DRM, and Lumina can remove it with [Steamless](https://github.com/atom0s/Steamless). It only touches executables that actually have the wrapper, and keeps the original. |
 | **History** | Every patch and restore, with where its backups are, how much space they take, and one-click open, restore and clean-up. |
 | **Safety checks** | Warns you if the game is running, checks you have the disk space first, and notices when antivirus eats a DLL. |
@@ -91,7 +92,7 @@ And it looks fine in light mode too:
 
 ## Using it
 
-You can open a game by dropping its folder on the window, browsing to it (Ctrl+O), or dropping the folder onto `Lumina.exe`. If Steam is installed, the Library page lists everything you've got. To patch a pile of games at once, tick them in the Library and hit the button at the bottom right.
+You can open a game by dropping its folder on the window, browsing to it (Ctrl+O), or dropping the folder onto `Lumina.exe`. Drop several folders onto it at once and they go straight into the Library's batch queue. If Steam is installed, the Library page lists everything you've got. To patch a pile of games at once, tick them in the Library and hit the button at the bottom right.
 
 Everything you patch or restore lands in History. From there you can open the game or backup folder, restore the original DLLs, or delete old backups.
 
@@ -104,6 +105,10 @@ SmokeAPI works differently from the other two. It doesn't pretend to be Steam, i
 <p align="center"><img src="screenshots/smokeapi.png" alt="Home page with SmokeAPI selected and SteamStub unpacking ticked" width="760"></p>
 
 Each game also gets its own emulator settings: username, Steam ID, language, offline mode, and a DLC list that Lumina can pull from Steam for you. They're written in whatever format the emulator you picked expects. For SmokeAPI that's just "unlock every DLC" plus any extra DLC Steam doesn't list, in `SmokeAPI.config.json`.
+
+Some older games won't start with Goldberg or gbe_fork unless the emulator is told exactly which Steam interface versions the game was built for. The settings dialog has a Generate button for that: it reads the version names out of the game's original `steam_api` DLL (the `.bak` copy, if it's already patched) and writes `steam_settings/steam_interfaces.txt`, the same thing gbe_fork's `generate_interfaces` tool does. You only need it when a game refuses to start, so Lumina never makes one on its own. A few DLLs, some engines' plug-in builds for example, carry every version of every interface and so can't say which ones the game uses. Lumina tells you instead of writing a misleading file.
+
+<p align="center"><img src="screenshots/interfaces.png" alt="The emulator settings dialog with the steam_interfaces.txt row" width="460"></p>
 
 ### SteamStub unpacking
 
@@ -143,11 +148,11 @@ The installer task needs [Inno Setup](https://jrsoftware.org/isinfo.php). `scoop
 
 ## Problems
 
-If something breaks, open an issue. Turn on "Log to file" in Settings first and attach what it writes, plus which game and which emulator you used, otherwise I'm just guessing.
+If something breaks, open an issue. Open the game in Lumina, go to Settings and hit "Copy diagnostics", then paste it into the issue. It has the versions, your settings, what Lumina found in that game (which DLLs are patched, which backups exist) and the end of the log, and it leaves your Windows account name out. Turn on "Write activity to a log file" first and repeat the problem if you can, otherwise the log part is empty and I'm mostly guessing.
 
 ## Roadmap
 
-The only thing left on the list is generating `steam_interfaces.txt` automatically for older games that need it. Everything else I wanted is already in: game info and covers, moving the game folder after patching, full-folder backups, switching emulators, and the per-game settings editor.
+Everything I wanted is in now: game info and covers, moving the game folder after patching, full-folder backups, switching emulators, the per-game settings editor, and `steam_interfaces.txt` for older games. If something keeps tripping you up, open an issue.
 
 <details>
 <summary><b>Project layout</b></summary>
@@ -162,6 +167,7 @@ src/main/java/com/javafxapp/javafxapp/
   backup/       history, backup sizes, folder restore
   library/      Steam library scan, game info, cover cache
   safety/       running-game check, disk space, Defender exclusion
+  support/      the diagnostics report for bug reports
   config/       settings and app data paths
   common/       background jobs, progress, file copying, HTTP, logging
   ui/           window shell, pages, components, dialogs

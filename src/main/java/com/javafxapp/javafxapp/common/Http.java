@@ -29,8 +29,15 @@ public final class Http {
 
     public static String getString(String url) throws IOException, InterruptedException {
         HttpResponse<String> response = CLIENT.send(request(url), HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) throw new IOException("HTTP " + response.statusCode() + " for " + url);
+        if (response.statusCode() != 200) throw failure(response.statusCode(), response.headers().firstValue("x-ratelimit-remaining").orElse(""), url);
         return response.body();
+    }
+
+    static IOException failure(int status, String rateLimitRemaining, String url) {
+        // GitHub allows 60 requests an hour without a login, and answers 403 once they're used up
+        if ((status == 403 || status == 429) && (rateLimitRemaining.equals("0") || status == 429))
+            return new IOException("The server says too many requests were made from this connection. Wait a while and try again.");
+        return new IOException("HTTP " + status + " for " + url);
     }
 
     public static void download(String url, Path target, Progress progress) throws IOException, InterruptedException {

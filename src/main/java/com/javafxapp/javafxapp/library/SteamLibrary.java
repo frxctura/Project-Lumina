@@ -1,13 +1,13 @@
 package com.javafxapp.javafxapp.library;
 
 import com.javafxapp.javafxapp.common.Log;
+import com.javafxapp.javafxapp.common.Processes;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -15,7 +15,6 @@ import java.util.stream.Stream;
 public final class SteamLibrary {
 
     private static final Path DEFAULT_STEAM = Path.of("C:/Program Files (x86)/Steam");
-    private static final Pattern REG_STEAM_PATH = Pattern.compile("SteamPath\\s+REG_\\w+\\s+(.+)");
     private static final Set<String> TOOL_APP_IDS = Set.of("228980");
     private static final List<String> TOOL_PREFIXES = List.of("Steamworks", "Steam Linux Runtime", "Proton ");
     private static final String CDN_HEADER = "https://cdn.cloudflare.steamstatic.com/steam/apps/%s/header.jpg";
@@ -52,18 +51,26 @@ public final class SteamLibrary {
     static Optional<Path> findSteam() {
         Optional<Path> fromRegistry = Optional.empty();
         try {
-            Process reg = new ProcessBuilder("reg", "query", "HKCU\\Software\\Valve\\Steam", "/v", "SteamPath")
-                    .redirectErrorStream(true).start();
-            String out = new String(reg.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            if (reg.waitFor(5, TimeUnit.SECONDS)) fromRegistry = parseRegQuery(out).map(Path::of);
+            fromRegistry = registryValue("HKCU\\Software\\Valve\\Steam", "SteamPath").map(Path::of);
         } catch (IOException | RuntimeException e) {
             Log.error("Could not read the Steam path from the registry", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
-        return fromRegistry.or(() -> Optional.of(DEFAULT_STEAM))
-                .filter(p -> Files.isDirectory(p.resolve("steamapps")))
+        return fromRegistry.filter(p -> Files.isDirectory(p.resolve("steamapps")))
+                .or(() -> Optional.of(DEFAULT_STEAM).filter(p -> Files.isDirectory(p.resolve("steamapps"))))
                 .map(SteamLibrary::realCase);
+    }
+
+    /**
+     * Reads a string value from the registry. reg.exe writes in the console's code page, which is rarely UTF-8, and
+     * characters it can't represent turn into "?", so a Steam folder like D:\Spiele Größe would come back wrong.
+     * Switching the code page to UTF-8 first makes it write the real text.
+     */
+    static Optional<String> registryValue(String key, String value) throws IOException, InterruptedException {
+        Processes.Result result = Processes.run(new ProcessBuilder("cmd.exe", "/d", "/s", "/c",
+                "chcp 65001>nul & reg query " + key + " /v " + value), Duration.ofSeconds(10));
+        return result.succeeded() ? parseRegQuery(result.output(), value) : Optional.empty();
     }
 
     // steam lowercases the path, the real casing looks nicer
@@ -76,7 +83,11 @@ public final class SteamLibrary {
     }
 
     static Optional<String> parseRegQuery(String output) {
-        Matcher m = REG_STEAM_PATH.matcher(output);
+        return parseRegQuery(output, "SteamPath");
+    }
+
+    static Optional<String> parseRegQuery(String output, String valueName) {
+        Matcher m = Pattern.compile("(?m)^\\s*" + Pattern.quote(valueName) + "\\s+REG_\\w+\\s+(.+)$").matcher(output);
         return m.find() ? Optional.of(m.group(1).trim()).filter(s -> !s.isEmpty()) : Optional.empty();
     }
 

@@ -9,7 +9,12 @@ public final class Errors {
     private Errors() {}
 
     public static String describe(Throwable t) {
-        String msg = String.valueOf(t.getMessage());
+        String msg = t.getMessage();
+        if (msg == null || msg.isBlank()) {
+            // a NullPointerException and the like have no message, and "null" tells nobody anything
+            Throwable cause = t.getCause();
+            return cause != null && cause != t ? describe(cause) : "Something went wrong (" + t.getClass().getSimpleName() + ").";
+        }
         if (msg.toLowerCase().contains("virus") || msg.toLowerCase().contains("unwanted software"))
             return "Blocked by antivirus. Add an exclusion for the Lumina folder and the game directory.";
         if (t instanceof AccessDeniedException)

@@ -528,6 +528,7 @@ public class LibraryController implements Page {
         batchRows.forEach(r -> {
             r.setLocked(false);
             if (r.state() == State.RUNNING) r.setState(State.CANCELLED, "Cancelled");
+            else if (r.state() == State.QUEUED) r.setState(State.QUEUED, "Queued"); // never got to it, so not "Waiting" any more
             GameTile tile = tiles.get(r.dir);
             if (tile != null) knownGame(r.dir).ifPresent(g -> inspect(g, tile));
         });

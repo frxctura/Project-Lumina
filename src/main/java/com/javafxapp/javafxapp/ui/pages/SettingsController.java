@@ -6,6 +6,7 @@ import com.javafxapp.javafxapp.common.FileOps;
 import com.javafxapp.javafxapp.common.Log;
 import com.javafxapp.javafxapp.config.AppPaths;
 import com.javafxapp.javafxapp.config.AppSettings;
+import com.javafxapp.javafxapp.support.Diagnostics;
 import com.javafxapp.javafxapp.safety.DefenderExclusion;
 import com.javafxapp.javafxapp.emulator.Emulator;
 import com.javafxapp.javafxapp.emulator.EmulatorInstaller;
@@ -26,6 +27,8 @@ import javafx.css.PseudoClass;
 import javafx.fxml.FXML;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.input.Clipboard;
+import javafx.scene.input.ClipboardContent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -56,7 +59,7 @@ public class SettingsController implements Page {
     @FXML private CheckBox unpackDrmCheckbox;
     @FXML private Label moveDirLabel, backupDirLabel, appDataLabel;
     @FXML private Button selectMoveDir, openMoveDir, selectBackupDir, openBackupDir;
-    @FXML private Button openAppData, openLogsButton, clearRecentButton, resetSettings, excludeEmulatorsButton;
+    @FXML private Button openAppData, openLogsButton, clearRecentButton, resetSettings, excludeEmulatorsButton, copyDiagnosticsButton;
     @FXML private CheckBox logToFileCheckbox, moveGameDirCheckbox, backupGameDirCheckbox, previewCheckbox;
     @FXML private ToggleButton themeDark, themeLight, themeSystem;
     @FXML private Label themeHint;
@@ -87,6 +90,9 @@ public class SettingsController implements Page {
         openBackupDir.setOnAction(e -> Ui.openFolder(Path.of(AppSettings.getBackupGameDirPath())));
 
         excludeEmulatorsButton.setOnAction(e -> excludeEmulators());
+        copyDiagnosticsButton.setOnAction(e -> copyDiagnostics());
+        copyDiagnosticsButton.setTooltip(new Tooltip("Copies versions, settings, what Lumina found in the game open on Home, and the end of the log, "
+                + "for a bug report. Your Windows account name is left out."));
         appDataLabel.setText(AppPaths.home().toString());
         openAppData.setOnAction(e -> openCreating(AppPaths.home()));
         openLogsButton.setOnAction(e -> openCreating(AppPaths.logs()));
@@ -139,6 +145,32 @@ public class SettingsController implements Page {
             shell.toast(Toaster.Kind.ERROR, com.javafxapp.javafxapp.common.Errors.describe(task.getException()));
         });
         Ui.start(task, "defender-exclusion");
+    }
+
+    private void copyDiagnostics() {
+        copyDiagnosticsButton.setDisable(true);
+        var game = shell.currentGame();
+        Task<String> task = new Task<>() {
+            @Override
+            protected String call() {
+                return Diagnostics.build(game);
+            }
+        };
+        task.setOnSucceeded(e -> {
+            copyDiagnosticsButton.setDisable(false);
+            ClipboardContent content = new ClipboardContent();
+            content.putString(task.getValue());
+            Clipboard.getSystemClipboard().setContent(content);
+            shell.toast(Toaster.Kind.SUCCESS, game.isPresent()
+                    ? "Copied, including " + game.get().getFileName() + ". Paste it into your bug report."
+                    : "Copied. Open the game on Home first if the report is about one, then copy again.");
+        });
+        task.setOnFailed(e -> {
+            copyDiagnosticsButton.setDisable(false);
+            Log.error("Could not build the diagnostics", task.getException());
+            shell.toast(Toaster.Kind.ERROR, "Could not collect the diagnostics: " + Errors.describe(task.getException()));
+        });
+        Ui.start(task, "diagnostics");
     }
 
     private void setUpThemeToggle() {

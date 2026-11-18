@@ -1,5 +1,6 @@
 package com.javafxapp.javafxapp.library;
 
+import com.javafxapp.javafxapp.common.FileOps;
 import com.javafxapp.javafxapp.patching.PatchDetector;
 import com.javafxapp.javafxapp.patching.SteamApi;
 import com.javafxapp.javafxapp.unpack.SteamStub;
@@ -37,26 +38,24 @@ public record GameInfo(Path path, long totalSize, long fileCount, Optional<Path>
             Path exe, appIdFile;
         };
 
-        try (Stream<Path> files = Files.walk(dir)) {
-            files.filter(Files::isRegularFile).forEach(p -> {
-                long fileSize = sizeOf(p);
-                acc.size += fileSize;
-                acc.count++;
-                String name = p.getFileName().toString().toLowerCase();
-                if (name.endsWith(".exe") && !name.endsWith(".unpacked.exe") && SteamStub.isProtected(p)) acc.stubs++;
-                if (SteamApi.isDll(name)) acc.dlls.add(p);
-                else if (SteamApi.isBackup(name)) acc.backups++;
-                else if (name.equals(SteamApi.APPID_FILE) && acc.appIdFile == null) acc.appIdFile = p;
-                else if (name.endsWith(".exe") && !isHelperExe(name)) {
-                    // a big exe near the top is usually the game itself
-                    long score = fileSize - (dir.relativize(p).getNameCount() - 1) * 50_000_000L;
-                    if (score > acc.bestExeScore) {
-                        acc.bestExeScore = score;
-                        acc.exe = p;
-                    }
+        FileOps.regularFiles(dir).forEach(p -> {
+            long fileSize = sizeOf(p);
+            acc.size += fileSize;
+            acc.count++;
+            String name = p.getFileName().toString().toLowerCase();
+            if (name.endsWith(".exe") && !name.endsWith(".unpacked.exe") && SteamStub.isProtected(p)) acc.stubs++;
+            if (SteamApi.isDll(name)) acc.dlls.add(p);
+            else if (SteamApi.isBackup(name)) acc.backups++;
+            else if (name.equals(SteamApi.APPID_FILE) && acc.appIdFile == null) acc.appIdFile = p;
+            else if (name.endsWith(".exe") && !isHelperExe(name)) {
+                // a big exe near the top is usually the game itself
+                long score = fileSize - (dir.relativize(p).getNameCount() - 1) * 50_000_000L;
+                if (score > acc.bestExeScore) {
+                    acc.bestExeScore = score;
+                    acc.exe = p;
                 }
-            });
-        }
+            }
+        });
 
         String modified = DATE_FORMAT.format(Files.getLastModifiedTime(dir).toInstant());
         Optional<String> appId = Optional.ofNullable(acc.appIdFile).flatMap(SteamApi::readAppId);

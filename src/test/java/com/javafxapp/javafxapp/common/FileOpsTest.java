@@ -85,4 +85,41 @@ class FileOpsTest {
             Thread.interrupted();
         }
     }
+
+    private static boolean icacls(Path dir, String... args) throws Exception {
+        java.util.List<String> command = new java.util.ArrayList<>(java.util.List.of("icacls", dir.toString()));
+        command.addAll(java.util.List.of(args));
+        return Processes.run(new ProcessBuilder(command), java.time.Duration.ofSeconds(20)).succeeded();
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledOnOs(org.junit.jupiter.api.condition.OS.WINDOWS)
+    void aFolderThatCannotBeReadDoesNotHideTheRestOfTheGame() throws Exception {
+        Path game = makeGame();
+        Path locked = Files.createDirectories(game.resolve("locked"));
+        Files.writeString(locked.resolve("secret.bin"), "12345");
+
+        // deny listing the folder to everyone, like a permission-protected subfolder in a game
+        org.junit.jupiter.api.Assumptions.assumeTrue(icacls(locked, "/deny", "*S-1-1-0:(RD)"), "could not change permissions here");
+        try {
+            boolean denied;
+            try (var listing = Files.list(locked)) {
+                denied = false;
+            } catch (java.io.IOException e) {
+                denied = true;
+            }
+            org.junit.jupiter.api.Assumptions.assumeTrue(denied, "the folder is still readable, so there's nothing to test");
+
+            assertEquals(2, FileOps.findFiles(game, n -> n.endsWith(".exe") || n.endsWith(".dll")).size());
+            assertEquals(3 + 8, FileOps.totalSize(game), "game.exe + steam_api64.dll; the locked folder is skipped");
+            assertEquals(1, GameInfo.scan(game).dllCount(), "the game can still be opened");
+        } finally {
+            icacls(locked, "/remove:d", "*S-1-1-0"); // so the temp folder can be cleaned up
+        }
+    }
+
+    @Test
+    void aMissingRootStillFailsClearly() {
+        assertThrows(java.io.IOException.class, () -> FileOps.findFiles(tmp.resolve("not-there"), n -> true));
+    }
 }

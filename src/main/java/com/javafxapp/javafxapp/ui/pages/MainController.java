@@ -244,6 +244,11 @@ public class MainController implements Page {
         readyView.pseudoClassStateChanged(DRAG_OVER, over);
     }
 
+    /** The game folder open on this page, or null. */
+    public Path currentGame() {
+        return gameDirectory;
+    }
+
     public void selectDirectory(Path dir) {
         if (isBusy()) return;
         if (!Files.isDirectory(dir)) {

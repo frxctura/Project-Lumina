@@ -3,17 +3,17 @@ package com.javafxapp.javafxapp.unpack;
 import com.javafxapp.javafxapp.common.FileOps;
 import com.javafxapp.javafxapp.common.Http;
 import com.javafxapp.javafxapp.common.Log;
+import com.javafxapp.javafxapp.common.Processes;
 import com.javafxapp.javafxapp.common.Progress;
 import com.javafxapp.javafxapp.common.StatusSink;
 import com.javafxapp.javafxapp.config.AppPaths;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -130,30 +130,22 @@ public final class Steamless {
         Path unpacked = exe.resolveSibling(exe.getFileName() + SteamStub.UNPACKED_SUFFIX);
         Files.deleteIfExists(unpacked);
 
-        Process process;
+        Processes.Result result;
         try {
-            process = new ProcessBuilder(dir().resolve(CLI).toString(), "--quiet", exe.toString())
-                    .directory(dir().toFile()).redirectErrorStream(true).start();
+            result = Processes.run(new ProcessBuilder(dir().resolve(CLI).toString(), "--quiet", exe.toString())
+                    .directory(dir().toFile()), Duration.ofMinutes(TIMEOUT_MINUTES));
         } catch (IOException e) {
             throw new IOException("Could not start Steamless. It needs the .NET Framework 4 that comes with Windows."
                     + " Antivirus may also have blocked it: " + e.getMessage(), e);
         }
-        String output;
-        try {
-            // Steamless prints a few lines at most, so reading to the end cannot stall it
-            output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8).strip();
-            if (!process.waitFor(TIMEOUT_MINUTES, TimeUnit.MINUTES)) {
-                process.destroyForcibly();
-                throw new IOException("Steamless took too long on " + exe.getFileName() + ".");
-            }
-        } catch (InterruptedException e) {
-            process.destroyForcibly();
-            throw e;
+        if (result.timedOut()) {
+            Files.deleteIfExists(unpacked);
+            throw new IOException("Steamless took too long on " + exe.getFileName() + ".");
         }
-        if (process.exitValue() != 0 || !Files.isRegularFile(unpacked)) {
+        if (result.exitCode() != 0 || !Files.isRegularFile(unpacked)) {
             Files.deleteIfExists(unpacked);
             throw new IOException("Steamless can't handle it (probably an unsupported SteamStub version)"
-                    + (output.isEmpty() ? "" : ": " + lastLine(output)));
+                    + (result.output().isEmpty() ? "" : ": " + lastLine(result.output())));
         }
         return unpacked;
     }

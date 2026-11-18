@@ -2,6 +2,7 @@ package com.javafxapp.javafxapp;
 
 import com.javafxapp.javafxapp.config.AppPaths;
 import com.javafxapp.javafxapp.config.AppSettings;
+import com.javafxapp.javafxapp.config.LaunchArgs;
 import com.javafxapp.javafxapp.emulator.EmulatorInstaller;
 import com.javafxapp.javafxapp.ui.pages.LibraryController;
 import com.javafxapp.javafxapp.ui.pages.MainController;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 
 public class LuminaApp extends Application {
@@ -57,6 +59,7 @@ public class LuminaApp extends Application {
         addPage(shell, View.SETTINGS, "SettingsView.fxml");
         shell.setGameOpener(main::selectDirectory);
         shell.setBatchHandler(library::enqueue);
+        shell.setCurrentGameSource(main::currentGame);
 
         // extra pane for the theme fade to draw on
         Scene scene = new Scene(new StackPane(shellRoot));
@@ -78,7 +81,10 @@ public class LuminaApp extends Application {
         stage.show();
         shell.start();
 
-        getParameters().getRaw().stream().map(Path::of).filter(Files::isDirectory).findFirst().ifPresent(shell::openGame);
+        // one folder dropped on Lumina.exe opens it, several go to the batch queue
+        List<Path> folders = LaunchArgs.folders(getParameters().getRaw());
+        if (folders.size() == 1) shell.openGame(folders.get(0));
+        else if (folders.size() > 1) shell.enqueueBatch(folders);
     }
 
     private static void restoreWindow(Stage stage, WindowChrome chrome) {

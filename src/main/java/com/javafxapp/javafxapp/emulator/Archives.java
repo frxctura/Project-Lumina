@@ -2,6 +2,7 @@ package com.javafxapp.javafxapp.emulator;
 
 import com.javafxapp.javafxapp.common.FileOps;
 import com.javafxapp.javafxapp.common.Log;
+import com.javafxapp.javafxapp.common.Processes;
 import com.javafxapp.javafxapp.patching.SteamApi;
 
 import org.apache.commons.compress.archivers.sevenz.SevenZArchiveEntry;
@@ -10,12 +11,11 @@ import org.apache.commons.compress.archivers.sevenz.SevenZFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -78,17 +78,12 @@ final class Archives {
         List<String> command = new ArrayList<>();
         command.add(root != null ? root + "\\System32\\tar.exe" : "tar");
         command.addAll(List.of(args));
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         try {
-            String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            if (!process.waitFor(2, TimeUnit.MINUTES)) {
-                process.destroyForcibly();
-                throw new IOException("tar took too long to read the archive.");
-            }
-            if (process.exitValue() != 0) throw new IOException("tar could not read the archive: " + output.strip());
-            return output;
+            Processes.Result result = Processes.run(new ProcessBuilder(command), Duration.ofMinutes(2));
+            if (result.timedOut()) throw new IOException("tar took too long to read the archive.");
+            if (result.exitCode() != 0) throw new IOException("tar could not read the archive: " + result.output());
+            return result.output();
         } catch (InterruptedException e) {
-            process.destroyForcibly();
             Thread.currentThread().interrupt();
             throw new IOException("Interrupted while reading the archive.", e);
         }

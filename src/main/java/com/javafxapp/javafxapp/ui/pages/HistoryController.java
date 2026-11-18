@@ -327,7 +327,8 @@ public class HistoryController implements Page {
             FileOps.deleteRecursive(folder);
         } finally {
             BackupStats.forget(folder);
-            History.add(entry.withoutFolderBackup());
+            // if something was left behind (a locked file), keep the link so the leftovers can be found and retried
+            if (!Files.exists(folder)) History.add(entry.withoutFolderBackup());
         }
     }
 

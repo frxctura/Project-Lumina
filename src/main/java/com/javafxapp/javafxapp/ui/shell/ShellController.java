@@ -1,5 +1,6 @@
 package com.javafxapp.javafxapp.ui.shell;
 
+import com.javafxapp.javafxapp.config.AppInfo;
 import com.javafxapp.javafxapp.config.AppSettings;
 import com.javafxapp.javafxapp.ui.components.Toaster;
 
@@ -24,7 +25,9 @@ import java.nio.file.Path;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public class ShellController implements AppShell {
 
@@ -39,6 +42,7 @@ public class ShellController implements AppShell {
     private FadeTransition pulse;
     private Consumer<Path> gameOpener = p -> {};
     private Consumer<List<Path>> batchHandler = l -> {};
+    private Supplier<Path> currentGameSource = () -> null;
 
     @FXML private BorderPane shellRoot;
     @FXML private StackPane content;
@@ -48,11 +52,12 @@ public class ShellController implements AppShell {
     @FXML private Region activityDot;
     @FXML private Button contactButton;
     @FXML private Button themeToggle;
-    @FXML private Label statusLabel;
+    @FXML private Label statusLabel, versionLabel;
 
     @FXML
     public void initialize() {
         toaster = new Toaster(toastLayer);
+        versionLabel.setText("Lumina " + AppInfo.version());
         navButtons.put(View.MAIN, navHome);
         navButtons.put(View.LIBRARY, navLibrary);
         navButtons.put(View.HISTORY, navHistory);
@@ -81,6 +86,15 @@ public class ShellController implements AppShell {
 
     public void setGameOpener(Consumer<Path> opener) {
         this.gameOpener = opener;
+    }
+
+    public void setCurrentGameSource(Supplier<Path> source) {
+        this.currentGameSource = source;
+    }
+
+    @Override
+    public Optional<Path> currentGame() {
+        return Optional.ofNullable(currentGameSource.get());
     }
 
     public void setBatchHandler(Consumer<List<Path>> handler) {

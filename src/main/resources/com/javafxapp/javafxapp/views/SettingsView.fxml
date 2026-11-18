@@ -83,6 +83,7 @@
                 <HBox styleClass="toolbar">
                     <Button fx:id="openLogsButton" styleClass="secondary-button" text="OPEN LOGS"/>
                     <Button fx:id="clearRecentButton" styleClass="secondary-button" text="CLEAR RECENT GAMES"/>
+                    <Button fx:id="copyDiagnosticsButton" styleClass="secondary-button" text="COPY DIAGNOSTICS"/>
                 </HBox>
             </HBox>
         </VBox>

@@ -1,11 +1,17 @@
 package com.javafxapp.javafxapp.library;
 
+import com.javafxapp.javafxapp.common.Processes;
+
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -95,5 +101,30 @@ class SteamLibraryTest {
         String out = "\r\nHKEY_CURRENT_USER\\Software\\Valve\\Steam\r\n    SteamPath    REG_SZ    c:/program files (x86)/steam\r\n\r\n";
         assertEquals(Optional.of("c:/program files (x86)/steam"), SteamLibrary.parseRegQuery(out));
         assertTrue(SteamLibrary.parseRegQuery("ERROR: The system was unable to find the specified registry key").isEmpty());
+    }
+
+    @Test
+    void parsesOnlyTheValueThatWasAskedFor() {
+        String out = "HKEY_X\\Y\r\n    Other    REG_SZ    nope\r\n    SteamPath    REG_SZ    D:\\Steam Games\r\n    SteamPathExtra    REG_SZ    also no\r\n";
+        assertEquals(Optional.of("D:\\Steam Games"), SteamLibrary.parseRegQuery(out, "SteamPath"));
+        assertEquals(Optional.of("nope"), SteamLibrary.parseRegQuery(out, "Other"));
+        assertTrue(SteamLibrary.parseRegQuery(out, "Missing").isEmpty());
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void readsARegistryValueWithCharactersOutsideTheConsoleCodePage() throws Exception {
+        String key = "HKCU\\Software\\LuminaTest-" + UUID.randomUUID();
+        String value = "D:\\Spiele Gr\u00f6\u00dfe\\Steam \u65e5\u672c";
+        try {
+            Processes.Result added = Processes.run(new ProcessBuilder("reg", "add", key, "/v", "SteamPath", "/t", "REG_SZ", "/d", value, "/f"),
+                    Duration.ofSeconds(20));
+            assertTrue(added.succeeded(), added.output());
+
+            assertEquals(Optional.of(value), SteamLibrary.registryValue(key, "SteamPath"));
+            assertTrue(SteamLibrary.registryValue(key, "NoSuchValue").isEmpty());
+        } finally {
+            Processes.run(new ProcessBuilder("reg", "delete", key, "/f"), Duration.ofSeconds(20));
+        }
     }
 }

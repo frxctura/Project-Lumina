@@ -50,6 +50,8 @@ public enum Emulator {
     /** Whether the emulator has its own username, Steam ID, language and offline switch. */
     public boolean supportsIdentity()  { return identity; }
     public boolean supportsUnlockAll() { return unlockAll; }
+    /** Goldberg and gbe_fork answer an older game's interface requests from steam_settings/steam_interfaces.txt. */
+    public boolean supportsInterfacesFile() { return !isProxy(); }
     public Path dir()                  { return AppPaths.emulators().resolve(dirName); }
     public Path dll(String name)       { return dir().resolve(name); }
 

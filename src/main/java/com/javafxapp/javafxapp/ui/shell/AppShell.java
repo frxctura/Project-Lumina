@@ -7,6 +7,7 @@ import javafx.stage.Window;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 public interface AppShell {
 
@@ -17,6 +18,9 @@ public interface AppShell {
     void openGame(Path dir);
 
     void enqueueBatch(List<Path> dirs);
+
+    /** The game open on the Home page, if there is one. */
+    Optional<Path> currentGame();
 
     void setStatus(String text);
 

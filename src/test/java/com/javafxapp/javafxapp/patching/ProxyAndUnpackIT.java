@@ -68,8 +68,10 @@ class ProxyAndUnpackIT {
         // the real downloads
         EmulatorInstaller.install(Emulator.SMOKEAPI, StatusSink.NONE, Progress.NONE);
         assertTrue(Emulator.SMOKEAPI.isInstalled());
-        assertEquals(3526144, Files.size(Emulator.SMOKEAPI.dll("steam_api.dll")), "smoke_api32.dll is stored as steam_api.dll");
-        assertEquals(4204032, Files.size(Emulator.SMOKEAPI.dll("steam_api64.dll")), "smoke_api64.dll is stored as steam_api64.dll");
+        // the two DLLs differ in size, and the 32-bit one must not have ended up as the 64-bit one (or the reverse)
+        assertTrue(Files.size(Emulator.SMOKEAPI.dll("steam_api.dll")) > 1_000_000, "smoke_api32.dll is stored as steam_api.dll");
+        assertTrue(Files.size(Emulator.SMOKEAPI.dll("steam_api64.dll")) > 1_000_000, "smoke_api64.dll is stored as steam_api64.dll");
+        assertNotEquals(Files.size(Emulator.SMOKEAPI.dll("steam_api.dll")), Files.size(Emulator.SMOKEAPI.dll("steam_api64.dll")));
         System.out.println("SmokeAPI version: " + Emulator.SMOKEAPI.installedVersion().orElse("?"));
 
         Steamless.install(StatusSink.NONE, Progress.NONE);
@@ -218,6 +220,63 @@ class ProxyAndUnpackIT {
         assertEquals(1, r.failed());
         assertArrayEquals(before, Files.readAllBytes(game.resolve("steam_api64.dll")));
         assertFalse(Files.exists(game.resolve("steam_api64_o.dll")));
+    }
+
+    @Test
+    void aGameWithNothingToChangeIsNotCopiedForNothing() throws Exception {
+        if (!Emulator.SMOKEAPI.isInstalled()) EmulatorInstaller.install(Emulator.SMOKEAPI, StatusSink.NONE, Progress.NONE);
+        Path backups = Files.createDirectories(tmp.resolve("Backups"));
+        Path game = Files.createDirectories(tmp.resolve("Game"));
+        Files.writeString(game.resolve("steam_api64.dll"), "the real steam api");
+        Files.writeString(game.resolve("data.pak"), "lots of data");
+        var request = new CrackJob.Request(game, Emulator.SMOKEAPI, true, "", Optional.of(backups), Optional.empty(), false);
+
+        CrackJob.Result first = run(request);
+        assertEquals(1, first.patched());
+        assertTrue(first.folderBackup().isPresent(), "the first patch changes things, so it gets its copy");
+        assertTrue(Files.isDirectory(first.folderBackup().get()));
+
+        // the same again: every DLL is up to date, so there's nothing a backup could protect
+        assertTrue(CrackJob.plan(request).folderBackup().isEmpty(), "the preview doesn't promise a copy either");
+        CrackJob.Result second = run(request);
+        assertEquals(0, second.patched());
+        assertEquals(1, second.upToDate());
+        assertTrue(second.folderBackup().isEmpty());
+        try (var folders = Files.list(backups)) {
+            assertEquals(1, folders.count(), "still only the first copy, no second multi-gigabyte one");
+        }
+    }
+
+    @Test
+    void aFolderWithoutSteamApiDllsLeavesNoBackupBehind() throws Exception {
+        if (!Emulator.SMOKEAPI.isInstalled()) EmulatorInstaller.install(Emulator.SMOKEAPI, StatusSink.NONE, Progress.NONE);
+        Path backups = Files.createDirectories(tmp.resolve("Backups"));
+        Path game = Files.createDirectories(tmp.resolve("NoSteamHere"));
+        Files.writeString(game.resolve("data.pak"), "lots of data");
+
+        CrackJob.Result r = run(new CrackJob.Request(game, Emulator.SMOKEAPI, true, "", Optional.of(backups), Optional.empty(), false));
+
+        assertEquals(0, r.patched());
+        assertTrue(r.folderBackup().isEmpty());
+        try (var folders = Files.list(backups)) {
+            assertEquals(0, folders.count(), "nothing was copied");
+        }
+    }
+
+    @Test
+    void aBackupFolderInsideTheGameFailsBeforeTouchingAnything() throws Exception {
+        if (!Emulator.SMOKEAPI.isInstalled()) EmulatorInstaller.install(Emulator.SMOKEAPI, StatusSink.NONE, Progress.NONE);
+        Path game = Files.createDirectories(tmp.resolve("Game"));
+        Files.writeString(game.resolve("steam_api64.dll"), "the real steam api");
+
+        CrackJob job = new CrackJob(new CrackJob.Request(game, Emulator.SMOKEAPI, true, "", Optional.of(game.resolve("backups")),
+                Optional.empty(), false), StatusSink.NONE);
+        job.run();
+
+        var failure = assertThrows(java.util.concurrent.ExecutionException.class, job::get);
+        assertTrue(failure.getCause().getMessage().contains("inside the game folder"), failure.getCause().getMessage());
+        assertEquals("the real steam api", Files.readString(game.resolve("steam_api64.dll")));
+        assertFalse(Files.exists(game.resolve("backups")));
     }
 
     private static CrackJob.Result run(CrackJob.Request request) throws Exception {

@@ -116,7 +116,7 @@ Lumina only touches the `steam_api` DLLs in the folder you give it. It searches 
 
 ## How it's made
 
-I build Lumina with AI tools, mostly Claude Code, and I'd rather say so up front than have you wonder. It's not a pile of generated code that nobody looked at, though. I test it, I make sure it works properly and looks good, and the file handling, patch detection and rollback code have real tests (`gradlew test`). If it doesn't work, it doesn't go out.
+I build Lumina alongside AI tools, mostly Claude Code, and I'd rather say so up front than have you wonder. It's not a pile of generated code that nobody looked at, though. I test it, I make sure it works properly and looks good, and the file handling, patch detection and rollback code have real tests (`gradlew test`). If it doesn't work, it doesn't go out.
 
 If you see "AI" and write something off as slop on the spot, Lumina probably isn't for you, and that's fine. If you just want something that does the job without breaking your games, give it a go :)
 

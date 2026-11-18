@@ -198,6 +198,9 @@ class ScreenshotsIT {
         Emulator emulatorBefore = AppSettings.getEmulator();
         boolean unpackBefore = AppSettings.isUnpackDrm(), previewBefore = AppSettings.isPreviewBeforePatch();
         List<Path> recentBefore = new ArrayList<>(AppSettings.getRecentGames());
+        // the Defender prompt remembers which folders it asked about, in the real settings; the temp folders mustn't stay there
+        java.util.prefs.Preferences prefs = java.util.prefs.Preferences.userRoot().node("com/javafxapp/javafxapp");
+        String defenderAskedBefore = prefs.get("defenderAsked", null);
         try {
             AppSettings.setEmulator(Emulator.SMOKEAPI);
             AppSettings.setUnpackDrm(true);
@@ -274,13 +277,13 @@ class ScreenshotsIT {
             save("05-preview-smokeapi-unpack", dialog.getScene());
             Window preview = dialog;
             fx(() -> {
-                fire(preview, "PATCH");
+                fire(preview, "Patch");
                 return null;
             });
             long done = System.currentTimeMillis() + 60_000;
             settle(600);
             save("05b-home-patching", ui.scene());
-            while (System.currentTimeMillis() < done && !fx(() -> crack.getText().equals("START CRACKING") || crack.getText().equals("RE-APPLY PATCH") || crack.getText().contains("DONE")))
+            while (System.currentTimeMillis() < done && !fx(() -> crack.getText().equals("Patch game") || crack.getText().equals("Re-apply patch") || crack.getText().equals("Done")))
                 settle(300);
             settle(2500);
             save("05c-home-after-patch", ui.scene());
@@ -305,7 +308,7 @@ class ScreenshotsIT {
                 return null;
             });
             settle(1000);
-            save("06-settings-page", ((ScrollPane) ui.settings()).getContent());
+            save("06-settings-page", ui.scene());
 
             // Library: batch queue and its preview
             fx(() -> {
@@ -329,6 +332,8 @@ class ScreenshotsIT {
             AppSettings.setPreviewBeforePatch(previewBefore);
             AppSettings.clearRecentGames();
             for (int i = recentBefore.size() - 1; i >= 0; i--) AppSettings.addRecentGame(recentBefore.get(i));
+            if (defenderAskedBefore == null) prefs.remove("defenderAsked");
+            else prefs.put("defenderAsked", defenderAskedBefore);
             if (main != null) fx(() -> {
                 main.hide();
                 return null;

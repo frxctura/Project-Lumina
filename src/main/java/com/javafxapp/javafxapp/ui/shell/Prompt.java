@@ -21,7 +21,7 @@ public final class Prompt {
     private String title, message, note;
     private List<String> details = List.of();
     private final List<Node> extras = new ArrayList<>();
-    private String confirm = "OK", cancel = "CANCEL";
+    private String confirm = "OK", cancel = "Cancel";
     private boolean destructive, singleButton;
     private double width = 460;
     private Alert built;

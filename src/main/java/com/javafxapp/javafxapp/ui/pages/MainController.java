@@ -20,6 +20,7 @@ import com.javafxapp.javafxapp.patching.SteamApi;
 import com.javafxapp.javafxapp.config.AppPaths;
 import com.javafxapp.javafxapp.safety.DefenderExclusion;
 import com.javafxapp.javafxapp.safety.ProcessGuard;
+import com.javafxapp.javafxapp.ui.components.Icon;
 import com.javafxapp.javafxapp.ui.components.StepIndicator;
 import com.javafxapp.javafxapp.ui.components.Toaster;
 import com.javafxapp.javafxapp.ui.dialogs.DefenderPrompt;
@@ -42,7 +43,10 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.*;
+import javafx.scene.AccessibleRole;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 import javafx.util.Duration;
@@ -90,6 +94,9 @@ public class MainController implements Page {
     @FXML private ImageView coverIcon, coverHeader;
     @FXML private Label gameName, gameSize, fileCount, dllCount, gameExecutable, lastModified, gamePath, backupInfo, stubInfo;
     @FXML private Hyperlink backupLink;
+    @FXML private VBox resultCard, infoPanel;
+    @FXML private StackPane dropIcon;
+    @FXML private Label emulatorLabel, appIdLabel;
 
     private Image placeholder() {
         return Theme.isLight() ? iconOnLight : iconOnDark;
@@ -108,13 +115,19 @@ public class MainController implements Page {
         emulatorBox.setTooltip(new Tooltip("Which Steam emulator to install into the game"));
         emulatorSettingsButton.setTooltip(new Tooltip("Emulator settings for this game: username, language, DLC…"));
         emulatorSettingsButton.setOnAction(e -> openEmulatorSettings());
+        emulatorSettingsButton.setGraphic(Icon.SETTINGS.create(16));
+        emulatorSettingsButton.setAccessibleText("Emulator settings for this game");
+        emulatorLabel.setLabelFor(emulatorBox);
+        appIdLabel.setLabelFor(appIdField);
+        dropIcon.getChildren().setAll(Icon.ARROW_DOWNLOAD.create(36));
+        logList.setAccessibleText("Activity log");
 
         backupCheckBox.setSelected(AppSettings.isBackupDlls());
         backupCheckBox.selectedProperty().addListener((o, a, v) -> { if (!syncingBackup) AppSettings.setBackupDlls(v); });
         unpackCheckBox.setSelected(AppSettings.isUnpackDrm());
         unpackCheckBox.selectedProperty().addListener((o, a, v) -> AppSettings.setUnpackDrm(v));
-        unpackCheckBox.setTooltip(new Tooltip("Removes Steam's SteamStub DRM wrapper from the game's .exe with Steamless, only if it has one. "
-                + "The original is kept as <name>.exe.steamstub.bak."));
+        unpackCheckBox.setTooltip(new Tooltip("Some games wrap their .exe in Steam's SteamStub DRM. Steamless removes it, only from "
+                + "executables that have it. The original is kept as <name>.exe.steamstub.bak."));
 
         appIdField.setTextFormatter(new TextFormatter<String>(c -> c.getControlNewText().matches("\\d{0,10}") ? c : null));
         appIdField.setTooltip(new Tooltip("Steam App ID, written to steam_appid.txt and used to show store info"));
@@ -259,6 +272,11 @@ public class MainController implements Page {
         gameDirectory = dir;
         gameInfo = null;
         AppSettings.addRecentGame(dir);
+        hideResult();
+        if (!infoPanel.isVisible()) {
+            infoPanel.setManaged(true);
+            Ui.reveal(infoPanel, 260);
+        }
 
         readyTitle.setText(dir.getFileName().toString());
         patchBadge.setVisible(false);
@@ -278,6 +296,9 @@ public class MainController implements Page {
         gameDirectory = null;
         gameInfo = null;
         clearGameInfo();
+        hideResult();
+        infoPanel.setVisible(false);
+        infoPanel.setManaged(false);
         shell.setStatus("Ready");
         Ui.swap(readyView, selectView);
         showRecent();
@@ -545,7 +566,7 @@ public class MainController implements Page {
                 .message(message)
                 .details(files)
                 .extra(again)
-                .confirm("PATCH").width(520)
+                .confirm("Patch").width(520)
                 .ask();
         if (!again.isSelected()) {
             AppSettings.setPreviewBeforePatch(false);
@@ -558,22 +579,24 @@ public class MainController implements Page {
         run(new CrackJob(request, sink()), r -> {
             if (r.rolledBack() && r.antivirus()) {
                 shell.setStatus("Blocked by antivirus, changes undone");
-                shell.toast(Toaster.Kind.ERROR, "Antivirus removed or changed the emulator DLL, so every change was undone. "
+                showResult("error", "Antivirus got in the way, nothing was changed",
+                        "Antivirus removed or changed the emulator DLL, so every change was undone and the game is as it was. "
                         + "Excluding the game folder from Microsoft Defender usually fixes this.",
-                        "ADD EXCLUSION", () -> addExclusion(request.gameDir()));
+                        resultAction("Add Defender exclusion", () -> addExclusion(request.gameDir())));
                 return;
             }
             if (r.rolledBack()) {
                 shell.setStatus("Patch failed, changes undone");
-                shell.toast(Toaster.Kind.ERROR, r.failed() + " file(s) failed, so every change was undone and the game is as it was. See the log for details.");
+                showResult("error", "The patch failed, nothing was changed",
+                        r.failed() + " file(s) failed, so every change was undone and the game is as it was. The log below says why.");
                 return;
             }
             boolean moved = !r.location().equals(request.gameDir());
             if (r.patched() == 0 && r.unpacked() == 0 && !moved) {
                 shell.setStatus(r.upToDate() > 0 ? "Already up to date" : "Nothing to patch");
-                shell.toast(Toaster.Kind.INFO, r.upToDate() > 0
-                        ? "Already patched with " + request.emulator() + ", nothing needed rewriting."
-                        : "No steam_api DLLs found, nothing was changed.");
+                showResult("info", r.upToDate() > 0 ? "Already patched" : "Nothing to patch", r.upToDate() > 0
+                        ? "This game is already patched with " + request.emulator() + ", so nothing needed rewriting."
+                        : "There are no steam_api DLLs in this folder, so nothing was changed.");
                 return;
             }
             History.add(HistoryEntry.patch(game, r.location(), request.emulator().toString(), r.verified(), r.failed(),
@@ -585,18 +608,27 @@ public class MainController implements Page {
             }
             if (r.failed() == 0 && r.unpackFailed() > 0) {
                 shell.setStatus("Patched, but " + r.unpackFailed() + " exe could not be unpacked");
-                shell.toast(Toaster.Kind.ERROR, "Patched " + r.verified() + " file(s), but Steamless could not unpack "
-                        + r.unpackFailed() + " executable(s), so the game may not start. See the log for details.",
-                        "Show backups", () -> shell.show(AppShell.View.HISTORY));
+                showResult("error", "Patched, but the DRM couldn't be removed",
+                        "Patched " + r.verified() + " file(s) with " + request.emulator() + ", but Steamless could not unpack "
+                        + r.unpackFailed() + " executable(s), so the game may not start. The log below says why.",
+                        resultAction("Open folder", () -> Ui.openFolder(gameDirectory)),
+                        resultAction("Show in History", () -> shell.show(AppShell.View.HISTORY)));
             } else if (r.failed() == 0) {
                 String unpacked = r.unpacked() > 0 ? " and unpacked " + r.unpacked() + " exe" : "";
                 shell.setStatus("Patched and verified " + r.verified() + " file(s) with " + request.emulator() + unpacked);
-                shell.toast(Toaster.Kind.SUCCESS, "Patched and verified " + r.verified() + " file(s) with " + request.emulator() + unpacked + ".",
-                        "Show backups", () -> shell.show(AppShell.View.HISTORY));
+                int kept = r.dllBackups().size();
+                String backups = kept == 0 && r.folderBackup().isEmpty() ? " No backup was kept."
+                        : " The originals are kept" + (kept > 0 ? " beside the game files" : "") + (r.folderBackup().isPresent() ? (kept > 0 ? " and" : "") + " in a full folder copy" : "") + ".";
+                Button restore = resultAction("Restore originals", this::startRestore);
+                restore.setDisable(kept == 0);
+                showResult("success", "Patched with " + request.emulator(),
+                        "Patched and verified " + r.verified() + " file(s)" + unpacked + "." + backups,
+                        resultAction("Open folder", () -> Ui.openFolder(gameDirectory)), restore,
+                        resultAction("Show in History", () -> shell.show(AppShell.View.HISTORY)));
                 flashCrackButton();
             } else {
                 shell.setStatus("Finished with errors");
-                shell.toast(Toaster.Kind.ERROR, r.verified() + " patched, " + r.failed() + " failed. See the log for details.");
+                showResult("error", "Finished with errors", r.verified() + " file(s) patched, " + r.failed() + " failed. The log below says why.");
             }
         });
     }
@@ -608,7 +640,7 @@ public class MainController implements Page {
                 .message("Defender stops scanning these folders, so it can't quarantine the emulator DLLs again.")
                 .details(List.of(dir.toString(), AppPaths.emulators().toString(), AppPaths.tools().toString()))
                 .note("Windows will ask for administrator permission.")
-                .confirm("ADD EXCLUSION").width(540)
+                .confirm("Add exclusion").width(540)
                 .ask()) return;
         planning = true;
         setBusy(true);
@@ -626,7 +658,7 @@ public class MainController implements Page {
             setBusy(false);
             log("Added Defender exclusions for " + dir + " and " + AppPaths.emulators(), false);
             shell.setStatus("Exclusion added");
-            shell.toast(Toaster.Kind.SUCCESS, "Exclusion added.", "PATCH AGAIN", () -> {
+            shell.toast(Toaster.Kind.SUCCESS, "Exclusion added.", "Patch again", () -> {
                 if (dir.equals(gameDirectory)) startCrack();
             });
         });
@@ -645,7 +677,7 @@ public class MainController implements Page {
         if (!Ui.prompt(shell.window())
                 .title("Put the original files back?")
                 .message(gameInfo.backupCount() + " backup file(s) are restored (.bak, *_o.dll and unpacked executables), replacing the emulator.")
-                .confirm("RESTORE")
+                .confirm("Restore")
                 .ask()) return;
         String game = gameName.getText();
         Path dir = gameDirectory;
@@ -656,7 +688,8 @@ public class MainController implements Page {
         run(new RestoreJob(dir, sink()), restored -> {
             History.add(HistoryEntry.restore(game, dir, restored));
             shell.setStatus("Restored " + restored + " file(s)");
-            shell.toast(Toaster.Kind.SUCCESS, "Restored " + restored + " original file(s).");
+            showResult("success", "Originals restored", "Put back " + restored + " original file(s). The emulator is gone from this game.",
+                    resultAction("Open folder", () -> Ui.openFolder(dir)));
         });
     }
 
@@ -695,7 +728,7 @@ public class MainController implements Page {
                 .title("This game is still running")
                 .message("Files that are in use can't be replaced. Close it, or let Lumina wait and carry on by itself once it's closed.")
                 .details(List.of(processNames(running)))
-                .confirm("WAIT FOR IT")
+                .confirm("Wait for it")
                 .ask();
     }
 
@@ -733,6 +766,7 @@ public class MainController implements Page {
 
     private <T> void run(Job<T> job, Consumer<T> onSuccess) {
         runningJob = job;
+        hideResult();
         setBusy(true);
 
         steps.setSteps(job.steps());
@@ -759,15 +793,15 @@ public class MainController implements Page {
             Log.error("Job failed", ex);
             log("Failed: " + Errors.describe(ex), true);
             shell.setStatus("Failed");
-            shell.toast(Toaster.Kind.ERROR, Errors.describe(ex));
+            showResult("error", "That didn't work", Errors.describe(ex) + (job instanceof CrackJob ? " Every change made so far was undone." : ""));
         });
         job.setOnCancelled(e -> {
             steps.fail();
             finishJob();
             log("Cancelled.", true);
             shell.setStatus("Cancelled");
-            shell.toast(Toaster.Kind.INFO, job instanceof CrackJob
-                    ? "Cancelled. Every change made so far was undone." : "Cancelled.");
+            showResult("info", "Cancelled", job instanceof CrackJob
+                    ? "Every change made so far was undone, the game is as it was." : "Stopped before it finished.");
         });
         Ui.start(job, "job");
     }
@@ -780,7 +814,7 @@ public class MainController implements Page {
         } else if (runningJob != null && Ui.prompt(shell.window())
                 .title("Stop what's running?")
                 .message("Lumina stops as soon as it safely can. A patch that's stopped halfway is put back how it was.")
-                .confirm("STOP").cancel("KEEP GOING").destructive()
+                .confirm("Stop").cancel("Keep going").destructive()
                 .ask()) {
             runningJob.cancel();
         }
@@ -796,6 +830,47 @@ public class MainController implements Page {
             readyTitle.setText(gameDirectory.getFileName().toString());
             refreshGameInfo();
         }
+    }
+
+    /**
+     * What happened, on the page until the next job or game, instead of a toast that disappears. It takes keyboard
+     * focus, so a screen reader reads it out and a keyboard user is right at its buttons.
+     */
+    private void showResult(String kind, String title, String text, Button... actions) {
+        Icon icon = switch (kind) { case "success" -> Icon.CHECKMARK_CIRCLE; case "error" -> Icon.ERROR_CIRCLE; default -> Icon.INFO; };
+        Label heading = new Label(title);
+        heading.getStyleClass().add("result-title");
+        heading.setWrapText(true);
+        heading.setMinHeight(Region.USE_PREF_SIZE);
+        Label body = new Label(text);
+        body.getStyleClass().add("result-text");
+        body.setWrapText(true);
+        body.setMinHeight(Region.USE_PREF_SIZE);
+        HBox top = Layout.row("toolbar", icon.create(20), heading);
+        resultCard.getChildren().setAll(top, body);
+        if (actions.length > 0) resultCard.getChildren().add(Layout.row("toolbar", actions));
+        resultCard.getStyleClass().removeAll("success", "error", "info");
+        resultCard.getStyleClass().add(kind);
+        resultCard.setFocusTraversable(true);
+        resultCard.setAccessibleRole(AccessibleRole.TEXT);
+        resultCard.setAccessibleText(title + ". " + text);
+        resultCard.setManaged(true);
+        Ui.reveal(resultCard, 220);
+        resultCard.requestFocus();
+    }
+
+    private static Button resultAction(String label, Runnable action) {
+        Button b = new Button(label);
+        b.getStyleClass().add("secondary-button");
+        b.setMnemonicParsing(false);
+        b.setOnAction(e -> action.run());
+        return b;
+    }
+
+    private void hideResult() {
+        resultCard.setVisible(false);
+        resultCard.setManaged(false);
+        resultCard.getChildren().clear();
     }
 
     private void showProgress() {
@@ -818,10 +893,10 @@ public class MainController implements Page {
         } finally {
             syncingBackup = false;
         }
-        backupCheckBox.setText(proxy ? "Original steam_api DLLs are kept as _o.dll (SmokeAPI needs them)" : "Back up original steam_api DLLs (.bak)");
+        backupCheckBox.setText(proxy ? "The original files are always kept (SmokeAPI needs them)" : "Keep a backup of the original files");
         backupCheckBox.setTooltip(new Tooltip(proxy
-                ? "SmokeAPI loads the original DLL from <name>_o.dll beside it, so it is always kept."
-                : "Keeps a copy of every original DLL as <name>.dll.bak next to it."));
+                ? "SmokeAPI loads the original steam_api DLL from <name>_o.dll beside it, so it is always kept."
+                : "Keeps a copy of every original steam_api DLL as <name>.dll.bak next to it, so Restore can put it back."));
         backupCheckBox.setDisable(busy || proxy);
     }
 
@@ -835,7 +910,7 @@ public class MainController implements Page {
     }
 
     private void flashCrackButton() {
-        crackButton.setText("✔  DONE");
+        crackButton.setText("Done");
         crackButton.getStyleClass().add("success");
         Ui.pop(crackButton);
         PauseTransition back = new PauseTransition(Duration.seconds(1.6));
@@ -871,9 +946,9 @@ public class MainController implements Page {
     }
 
     private String crackLabel() {
-        if (waitTimer != null) return "STOP WAITING";
-        if (runningJob != null) return "CANCEL";
-        return alreadyPatchedWith(emulatorBox.getValue()) ? "RE-APPLY PATCH" : "START CRACKING";
+        if (waitTimer != null) return "Stop waiting";
+        if (runningJob != null) return "Cancel";
+        return alreadyPatchedWith(emulatorBox.getValue()) ? "Re-apply patch" : "Patch game";
     }
 
     private boolean isBusy() {

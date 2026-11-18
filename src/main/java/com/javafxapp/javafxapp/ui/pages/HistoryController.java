@@ -106,11 +106,12 @@ public class HistoryController implements Page {
             applyFilter(new HashSet<>(cards.values()));
         });
         searchField.textProperty().addListener((o, a, b) -> applyFilter(Set.of()));
+        searchField.setAccessibleText("Search history by game or path");
 
         clearButton.setOnAction(e -> {
             if (Ui.prompt(shell.window()).title("Clear the whole history?")
                     .message("Only the list is cleared. Your backups stay where they are, and you can still restore from them by hand.")
-                    .confirm("CLEAR HISTORY").destructive().ask()) {
+                    .confirm("Clear history").destructive().ask()) {
                 History.clear();
                 reload(false);
             }
@@ -215,7 +216,7 @@ public class HistoryController implements Page {
         if (!Ui.prompt(shell.window()).title("Delete the folder backup of " + entry.game() + "?")
                 .message("This frees " + size + ". The backup files inside the game folder (.bak, _o.dll) are kept, so you can still put the originals back.")
                 .details(List.of(folder.toString()))
-                .confirm("DELETE BACKUP").destructive().width(520).ask()) return;
+                .confirm("Delete backup").destructive().width(520).ask()) return;
 
         setBusy(true);
         background(() -> {
@@ -253,7 +254,7 @@ public class HistoryController implements Page {
                 .message("Pick a rule, and you'll see what it frees before anything is deleted.")
                 .extra(choices, preview)
                 .note("The backup files inside game folders (.bak, _o.dll, .steamstub.bak) are never deleted here, they're the only way back to the originals.")
-                .confirm("DELETE").destructive().width(500);
+                .confirm("Delete").destructive().width(500);
         Node deleteButton = dialog.confirmButton();
 
         List<HistoryEntry> candidates = new ArrayList<>();
@@ -364,7 +365,7 @@ public class HistoryController implements Page {
                         + " or settings stored there since. The backup itself isn't changed.")
                 .details(List.of("Game folder:  " + gameDir, "Backup:  " + backup + size))
                 .extra(keep)
-                .confirm("RESTORE").width(540)
+                .confirm("Restore").width(540)
                 .ask();
         if (!go) {
             setBusy(false);
@@ -385,7 +386,7 @@ public class HistoryController implements Page {
             shell.setStatus("Folder restored");
             shell.toast(Toaster.Kind.SUCCESS, "Restored " + card.entry.game() + " from its folder backup."
                     + r.keptAs().map(p -> " The previous folder is at " + p.getFileName() + ".").orElse(""),
-                    "OPEN FOLDER", () -> Ui.openFolder(r.gameDir()));
+                    "Open folder", () -> Ui.openFolder(r.gameDir()));
         });
         job.setOnFailed(e -> {
             finishRestore(card);
@@ -482,7 +483,7 @@ public class HistoryController implements Page {
             Label step = new Label();
             step.getStyleClass().add("section-label");
             step.textProperty().bind(job.titleProperty());
-            Button cancel = button("CANCEL", job::cancel);
+            Button cancel = button("Cancel", job::cancel);
             cancel.disableProperty().bind(job.titleProperty().isEqualTo(FolderRestoreJob.SWAP));
             HBox top = Layout.row("toolbar", step, Layout.spacer(), cancel);
 
@@ -562,39 +563,61 @@ public class HistoryController implements Page {
             return grid;
         }
 
+        // the one or two things you came for are buttons, the rest is in "More" (a menu works with the keyboard, hover doesn't)
         private Node actions() {
             FlowPane left = new FlowPane();
             left.getStyleClass().add("gap-2");
             left.setAlignment(Pos.CENTER_LEFT);
-            if (stats.gameExists()) {
-                left.getChildren().add(button("OPEN IN LUMINA", () -> shell.openGame(entry.gameDir())));
-                left.getChildren().add(button("GAME FOLDER", () -> Ui.openFolder(entry.gameDir())));
-            }
-            if (stats.baksPresent() > 0)
-                entry.dllBackups().stream().filter(Files::exists).findFirst()
-                        .ifPresent(bak -> left.getChildren().add(button("SHOW BACKUP", () -> Ui.showInExplorer(bak))));
-            if (stats.folderExists())
-                left.getChildren().add(button("FOLDER BACKUP", () -> Ui.openFolder(entry.folderBackup().get())));
+            if (stats.gameExists()) left.getChildren().add(button("Open in Lumina", () -> shell.openGame(entry.gameDir())));
+            Optional<Path> bak = stats.baksPresent() > 0 ? entry.dllBackups().stream().filter(Files::exists).findFirst() : Optional.empty();
+            bak.ifPresent(b -> left.getChildren().add(button("Show backup", () -> Ui.showInExplorer(b))));
+            if (bak.isEmpty() && stats.folderExists())
+                left.getChildren().add(button("Open folder backup", () -> Ui.openFolder(entry.folderBackup().get())));
+
+            MenuButton more = new MenuButton("More");
+            more.getStyleClass().add("menu-button");
+            more.setPopupSide(javafx.geometry.Side.LEFT); // the button sits at the right edge, so open inward
+            more.setAccessibleText("More actions for " + entry.game());
+            List<MenuItem> items = new ArrayList<>();
+            if (stats.gameExists()) items.add(item("Open game folder", () -> Ui.openFolder(entry.gameDir())));
+            if (bak.isPresent() && stats.folderExists())
+                items.add(item("Open folder backup", () -> Ui.openFolder(entry.folderBackup().get())));
             if (entry.ownsFolderBackup() && stats.folderExists()) {
-                Button restore = button("RESTORE FROM FOLDER BACKUP", () -> restoreFromFolder(this));
-                restore.setTooltip(new Tooltip("Replace the game folder with this full copy"));
-                Button delete = button("DELETE FOLDER BACKUP", () -> deleteFolderBackup(this));
-                delete.getStyleClass().add("danger-text");
-                delete.setTooltip(new Tooltip("Free " + size(stats) + ". The backup files in the game folder are kept."));
+                MenuItem restore = item("Restore from folder backup…", () -> restoreFromFolder(this));
+                MenuItem delete = item("Delete folder backup (" + size(stats) + ")…", () -> deleteFolderBackup(this));
+                delete.getStyleClass().add("danger-item");
                 restore.setDisable(busy);
                 delete.setDisable(busy);
-                left.getChildren().addAll(restore, delete);
+                if (!items.isEmpty()) items.add(new SeparatorMenuItem());
+                items.addAll(List.of(restore, delete));
             }
-            Button forget = button("FORGET", () -> {
-                History.remove(entry.id());
-                reload(false);
-            });
-            forget.setTooltip(new Tooltip("Remove this entry. Backup files stay where they are."));
+            if (!items.isEmpty()) items.add(new SeparatorMenuItem());
+            MenuItem forget = item("Forget this entry", () -> forget(entry));
             forget.setDisable(running || busy);
+            items.add(forget);
+            more.getItems().setAll(items);
+
             HBox.setHgrow(left, Priority.ALWAYS);
-            HBox actions = Layout.row("toolbar", left, forget);
+            HBox actions = Layout.row("toolbar", left, more);
             actions.setAlignment(Pos.BOTTOM_LEFT);
             return actions;
         }
+    }
+
+    private static MenuItem item(String text, Runnable action) {
+        MenuItem item = new MenuItem(text);
+        item.setMnemonicParsing(false);
+        item.setOnAction(e -> action.run());
+        return item;
+    }
+
+    // no "are you sure": the entry comes back with one click, and the backup files were never touched
+    private void forget(HistoryEntry entry) {
+        History.remove(entry.id());
+        reload(false);
+        shell.toast(Toaster.Kind.INFO, "Forgot " + entry.game() + ". Its backup files are still where they were.", "Undo", () -> {
+            History.add(entry);
+            reload(false);
+        });
     }
 }

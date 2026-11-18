@@ -126,7 +126,9 @@ public final class WindowChrome {
         Button button = new Button();
         button.setGraphic(icon);
         button.getStyleClass().add("window-button");
+        // like Windows' own caption buttons: not in the Tab order, but named for screen readers
         button.setFocusTraversable(false);
+        button.setAccessibleText(switch (kind) { case "minimize" -> "Minimize"; case "maximize" -> "Maximize"; default -> "Close"; });
         button.setOnAction(e -> action.run());
         return button;
     }

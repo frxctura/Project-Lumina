@@ -7,7 +7,13 @@ import com.javafxapp.javafxapp.patching.PatchDetector;
 import com.javafxapp.javafxapp.ui.shell.Ui;
 
 import javafx.animation.TranslateTransition;
+import com.javafxapp.javafxapp.ui.shell.Motion;
+
 import javafx.css.PseudoClass;
+import javafx.scene.AccessibleAction;
+import javafx.scene.AccessibleAttribute;
+import javafx.scene.AccessibleRole;
+import javafx.scene.input.KeyCode;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -19,20 +25,42 @@ import javafx.scene.layout.*;
 import javafx.scene.shape.Rectangle;
 import javafx.util.Duration;
 
+import java.util.Optional;
+
 public final class GameTile extends StackPane {
 
     static final double WIDTH = 176;
     private static final double COVER_HEIGHT = Math.round(WIDTH * 215 / 460);
     private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
+    private static final double NAME_HEIGHT = 42; // two lines of 14px Nunito plus a little, or JavaFX cuts it to one
+    private final Runnable onToggle;
 
     private final Label size = new Label();
     private final Label badge = new Label("CHECKING");
-    private final Label check = new Label("✔");
+    private final StackPane check = new StackPane(Icon.CHECKMARK.create(14));
+    private final String gameName;
+    private PatchDetector.State state;
+    private String status = "checking";
     private final ImageView image = new ImageView();
     private boolean selected;
 
     public GameTile(SteamLibrary.Game game, Image cover, Runnable onToggle, Runnable onOpen) {
         getStyleClass().add("game-tile");
+        gameName = game.name();
+        // keyboard: Tab or the arrow keys (see LibraryController) to move, Space to tick, Enter to open
+        setFocusTraversable(true);
+        setAccessibleRole(AccessibleRole.CHECK_BOX);
+        setAccessibleHelp("Space adds it to the batch queue or takes it out, Enter opens it");
+        setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.SPACE) {
+                onToggle.run();
+                e.consume();
+            } else if (e.getCode() == KeyCode.ENTER) {
+                onOpen.run();
+                e.consume();
+            }
+        });
+        this.onToggle = onToggle;
         setAlignment(Pos.TOP_LEFT);
 
         Label initial = new Label(game.name().isBlank() ? "?" : game.name().substring(0, 1).toUpperCase());
@@ -62,7 +90,13 @@ public final class GameTile extends StackPane {
         Label name = new Label(game.name());
         name.getStyleClass().add("tile-name");
         name.setMaxWidth(WIDTH - 24);
-        Tooltip.install(this, new Tooltip(game.name() + "\n" + game.dir() + "\n\nClick to select  ·  double-click to open"));
+        // two lines before it gets cut, and always two lines tall so the tiles line up
+        name.setWrapText(true);
+        name.setAlignment(Pos.TOP_LEFT);
+        name.setMinHeight(NAME_HEIGHT);
+        name.setPrefHeight(NAME_HEIGHT);
+        name.setMaxHeight(NAME_HEIGHT);
+        Tooltip.install(this, new Tooltip(game.name() + "\n" + game.dir() + "\n\nClick or Space adds it to the batch  ·  double-click or Enter opens it"));
 
         size.getStyleClass().add("tile-size");
         badge.getStyleClass().addAll("badge", "badge-off");
@@ -97,6 +131,7 @@ public final class GameTile extends StackPane {
         if (value == selected) return;
         selected = value;
         pseudoClassStateChanged(SELECTED, value);
+        notifyAccessibleAttributeChanged(AccessibleAttribute.SELECTED);
         if (value) Ui.pop(check);
     }
 
@@ -108,7 +143,13 @@ public final class GameTile extends StackPane {
         size.setText(bytes >= 0 ? FileOps.formatSize(bytes) : "—");
     }
 
+    /** The patch state once it is known, for the Library filter. Empty while checking or if the folder can't be read. */
+    public Optional<PatchDetector.State> state() {
+        return Optional.ofNullable(state);
+    }
+
     public void showReport(PatchDetector.Report report) {
+        state = report.state();
         switch (report.state()) {
             case ORIGINAL -> setBadge("ORIGINAL", "badge-info", report.dlls().size() + " original steam_api DLL(s)");
             case PATCHED -> setBadge("PATCHED", "badge-ok",
@@ -123,6 +164,8 @@ public final class GameTile extends StackPane {
     }
 
     private void setBadge(String text, String style, String tooltip) {
+        status = text.toLowerCase();
+        notifyAccessibleAttributeChanged(AccessibleAttribute.TEXT);
         badge.setText(text);
         badge.getStyleClass().removeAll("badge-ok", "badge-warn", "badge-info", "badge-off");
         badge.getStyleClass().add(style);
@@ -144,7 +187,23 @@ public final class GameTile extends StackPane {
 
     private static void installLift(Region card) {
         TranslateTransition lift = new TranslateTransition(Duration.millis(140), card);
-        card.setOnMouseEntered(e -> { lift.setToY(-4); lift.playFromStart(); });
+        card.setOnMouseEntered(e -> { if (Motion.reduced()) return; lift.setToY(-4); lift.playFromStart(); });
         card.setOnMouseExited(e -> { lift.setToY(0); lift.playFromStart(); });
+    }
+
+    // what a screen reader says: "Cyberpunk 2077, patched, in the batch queue", and Space or its "click" ticks it
+    @Override
+    public Object queryAccessibleAttribute(AccessibleAttribute attribute, Object... parameters) {
+        return switch (attribute) {
+            case TEXT -> gameName + ", " + status + (selected ? ", in the batch queue" : "");
+            case SELECTED -> selected;
+            default -> super.queryAccessibleAttribute(attribute, parameters);
+        };
+    }
+
+    @Override
+    public void executeAccessibleAction(AccessibleAction action, Object... parameters) {
+        if (action == AccessibleAction.FIRE) onToggle.run();
+        else super.executeAccessibleAction(action, parameters);
     }
 }

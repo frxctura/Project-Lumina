@@ -14,6 +14,7 @@ import com.javafxapp.javafxapp.unpack.Steamless;
 import com.javafxapp.javafxapp.ui.components.Toaster;
 import com.javafxapp.javafxapp.ui.shell.AppShell;
 import com.javafxapp.javafxapp.ui.shell.Page;
+import com.javafxapp.javafxapp.ui.shell.Motion;
 import com.javafxapp.javafxapp.ui.shell.Theme;
 import com.javafxapp.javafxapp.ui.shell.Ui;
 
@@ -40,6 +41,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -62,11 +64,21 @@ public class SettingsController implements Page {
     @FXML private Button openAppData, openLogsButton, clearRecentButton, resetSettings, excludeEmulatorsButton, copyDiagnosticsButton;
     @FXML private CheckBox logToFileCheckbox, moveGameDirCheckbox, backupGameDirCheckbox, previewCheckbox;
     @FXML private ToggleButton themeDark, themeLight, themeSystem;
-    @FXML private Label themeHint;
+    @FXML private Label themeHint, motionHint, themeLabel, motionLabel;
+    @FXML private ToggleButton motionSystem, motionFull, motionReduced;
+    @FXML private VBox settingsNav, appearanceCard, backupCard, emulatorsCard, drmCard, dataCard;
+    @FXML private ScrollPane settingsScroll;
+    private final Map<VBox, Button> sectionButtons = new LinkedHashMap<>();
+    private Runnable motionSync;
+    private static final PseudoClass SELECTED = PseudoClass.getPseudoClass("selected");
 
     @FXML
     public void initialize() {
         setUpThemeToggle();
+        setUpMotionToggle();
+        setUpSectionList();
+        themeLabel.setLabelFor(themeDark);
+        motionLabel.setLabelFor(motionSystem);
         logToFileCheckbox.setOnAction(e -> {
             AppSettings.setLogToFile(logToFileCheckbox.isSelected());
             shell.setStatus("Logging to file " + (logToFileCheckbox.isSelected() ? "enabled" : "disabled"));
@@ -104,7 +116,7 @@ public class SettingsController implements Page {
             if (!Ui.prompt(shell.window())
                     .title("Reset all settings?")
                     .message("Everything on this page goes back to its default, and the theme goes back to dark. Your history and backups aren't touched.")
-                    .confirm("RESET").destructive()
+                    .confirm("Reset").destructive()
                     .ask()) return;
             AppSettings.reset();
             Theme.choose(AppSettings.Theme.DARK, settingsContainer.getScene());
@@ -121,7 +133,7 @@ public class SettingsController implements Page {
                 .message("Defender stops scanning them, so it can't quarantine the emulator DLLs and Steamless that Lumina keeps there.")
                 .details(java.util.List.of(dir.toString(), tools.toString()))
                 .note("Windows will ask for administrator permission.")
-                .confirm("ADD EXCLUSION").width(520)
+                .confirm("Add exclusion").width(520)
                 .ask()) return;
         excludeEmulatorsButton.setDisable(true);
         shell.setStatus("Waiting for administrator permission...");
@@ -173,6 +185,77 @@ public class SettingsController implements Page {
         Ui.start(task, "diagnostics");
     }
 
+    // the section list: a click scrolls to the card, scrolling highlights the card you're looking at
+    private void setUpSectionList() {
+        Map<String, VBox> sections = new LinkedHashMap<>();
+        sections.put("Appearance", appearanceCard);
+        sections.put("Backup & move", backupCard);
+        sections.put("Emulators", emulatorsCard);
+        sections.put("DRM unpacking", drmCard);
+        sections.put("App data & logs", dataCard);
+        sections.forEach((name, card) -> {
+            Button b = new Button(name);
+            b.getStyleClass().addAll("sidebar-button", "nav-button");
+            b.setMnemonicParsing(false);
+            b.setMaxWidth(Double.MAX_VALUE);
+            b.setAccessibleHelp("Jumps to the " + name + " settings");
+            b.setOnAction(e -> scrollTo(card));
+            sectionButtons.put(card, b);
+            settingsNav.getChildren().add(b);
+        });
+        settingsScroll.vvalueProperty().addListener((o, a, v) -> markSection());
+        settingsScroll.viewportBoundsProperty().addListener((o, a, v) -> markSection());
+        markSection();
+    }
+
+    private void scrollTo(VBox card) {
+        double content = settingsContainer.getLayoutBounds().getHeight();
+        double viewport = settingsScroll.getViewportBounds().getHeight();
+        if (content > viewport) settingsScroll.setVvalue(Math.min(1, Math.max(0, (card.getBoundsInParent().getMinY() - 16) / (content - viewport))));
+        // move keyboard focus into the section too, so Tab carries on from there
+        card.lookupAll(".button, .check-box, .toggle-button").stream().filter(n -> !n.isDisabled()).findFirst().ifPresent(javafx.scene.Node::requestFocus);
+        markSection(card);
+    }
+
+    private void markSection() {
+        double content = settingsContainer.getLayoutBounds().getHeight();
+        double viewport = settingsScroll.getViewportBounds().getHeight();
+        double top = settingsScroll.getVvalue() * Math.max(0, content - viewport);
+        VBox current = appearanceCard;
+        for (VBox card : sectionButtons.keySet()) if (card.getBoundsInParent().getMinY() - 40 <= top) current = card;
+        // at the very bottom the last card is the one you're reading, even if it's short
+        if (content > viewport && settingsScroll.getVvalue() >= 0.999) current = dataCard;
+        markSection(current);
+    }
+
+    private void markSection(VBox current) {
+        sectionButtons.forEach((card, b) -> b.pseudoClassStateChanged(SELECTED, card == current));
+    }
+
+    private void setUpMotionToggle() {
+        ToggleGroup group = new ToggleGroup();
+        Map<AppSettings.Motion, ToggleButton> buttons = new EnumMap<>(Map.of(
+                AppSettings.Motion.SYSTEM, motionSystem, AppSettings.Motion.FULL, motionFull, AppSettings.Motion.REDUCED, motionReduced));
+        buttons.forEach((motion, button) -> {
+            button.setToggleGroup(group);
+            button.setUserData(motion);
+        });
+        Runnable sync = () -> {
+            buttons.get(AppSettings.getMotion()).setSelected(true);
+            motionHint.setText(AppSettings.getMotion() == AppSettings.Motion.SYSTEM
+                    ? "Windows has animations " + (Motion.windowsAnimates() ? "on" : "off") : "");
+        };
+        sync.run();
+        motionSync = sync;
+        group.selectedToggleProperty().addListener((o, old, now) -> {
+            if (now == null) old.setSelected(true);
+            else {
+                AppSettings.setMotion((AppSettings.Motion) now.getUserData());
+                sync.run();
+            }
+        });
+    }
+
     private void setUpThemeToggle() {
         ToggleGroup group = new ToggleGroup();
         Map<AppSettings.Theme, ToggleButton> buttons = new EnumMap<>(Map.of(
@@ -208,6 +291,7 @@ public class SettingsController implements Page {
     }
 
     private void refresh() {
+        if (motionSync != null) motionSync.run();
         logToFileCheckbox.setSelected(AppSettings.isLogToFile());
         moveGameDirCheckbox.setSelected(AppSettings.isMoveGameDir());
         backupGameDirCheckbox.setSelected(AppSettings.isBackupGameDir());
@@ -246,15 +330,15 @@ public class SettingsController implements Page {
             text.getChildren().addAll(bar, detail);
         }
 
-        Button download = new Button(installed ? "UPDATE" : "DOWNLOAD");
+        Button download = new Button(installed ? "Update" : "Download");
         download.getStyleClass().add("secondary-button");
         download.setOnAction(e -> downloadSteamless());
         download.setDisable(downloadBusy());
-        Button open = new Button("OPEN");
+        Button open = new Button("Open");
         open.getStyleClass().add("secondary-button");
         open.setOnAction(e -> Ui.openFolder(Steamless.dir()));
         open.setDisable(!installed);
-        Button remove = new Button("REMOVE");
+        Button remove = new Button("Remove");
         remove.getStyleClass().add("secondary-button");
         remove.setOnAction(e -> removeSteamless());
         remove.setDisable(downloadBusy() || !installed);
@@ -307,7 +391,7 @@ public class SettingsController implements Page {
         if (!Ui.prompt(shell.window())
                 .title("Remove Steamless?")
                 .message("It's downloaded again the next time a patch needs it. Games you already unpacked aren't affected.")
-                .confirm("REMOVE").destructive()
+                .confirm("Remove").destructive()
                 .ask()) return;
         try {
             Steamless.uninstall();
@@ -337,15 +421,15 @@ public class SettingsController implements Page {
             text.getChildren().addAll(bar, detail);
         }
 
-        Button download = new Button(emulator.isInstalled() ? "UPDATE" : "DOWNLOAD");
+        Button download = new Button(emulator.isInstalled() ? "Update" : "Download");
         download.getStyleClass().add("secondary-button");
         download.setOnAction(e -> download(emulator));
         download.setDisable(downloadBusy());
-        Button open = new Button("OPEN");
+        Button open = new Button("Open");
         open.getStyleClass().add("secondary-button");
         open.setOnAction(e -> Ui.openFolder(emulator.dir()));
         open.setDisable(!emulator.isInstalled());
-        Button remove = new Button("REMOVE");
+        Button remove = new Button("Remove");
         remove.getStyleClass().add("secondary-button");
         remove.setOnAction(e -> remove(emulator));
         remove.setDisable(downloadBusy() || !emulator.isInstalled());
@@ -398,7 +482,7 @@ public class SettingsController implements Page {
         if (!Ui.prompt(shell.window())
                 .title("Remove " + emulator + "?")
                 .message("It's downloaded again the next time a patch needs it. Games you already patched aren't affected.")
-                .confirm("REMOVE").destructive()
+                .confirm("Remove").destructive()
                 .ask()) return;
         try {
             EmulatorInstaller.uninstall(emulator);

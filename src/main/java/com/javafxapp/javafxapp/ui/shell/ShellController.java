@@ -2,6 +2,7 @@ package com.javafxapp.javafxapp.ui.shell;
 
 import com.javafxapp.javafxapp.config.AppInfo;
 import com.javafxapp.javafxapp.config.AppSettings;
+import com.javafxapp.javafxapp.ui.components.Icon;
 import com.javafxapp.javafxapp.ui.components.Toaster;
 
 import javafx.animation.Animation;
@@ -65,6 +66,7 @@ public class ShellController implements AppShell {
         navButtons.forEach((view, button) -> button.setOnAction(e -> show(view)));
         Theme.bindImage(logo, Ui.image("logo.png"), Ui.image("logo-dark.png"));
         contactButton.setOnAction(e -> Ui.openUrl(Ui.CONTACT_URL));
+        contactButton.setAccessibleText("frxctura on GitHub (opens in the browser)");
         themeToggle.setOnAction(e -> Theme.choose(Theme.isLight() ? AppSettings.Theme.DARK : AppSettings.Theme.LIGHT, shellRoot.getScene()));
         Theme.currentProperty().addListener((o, old, now) -> updateThemeToggle());
         updateThemeToggle();
@@ -72,8 +74,10 @@ public class ShellController implements AppShell {
     }
 
     private void updateThemeToggle() {
-        themeToggle.setText(Theme.isLight() ? "☾" : "☀");
-        themeToggle.setTooltip(new Tooltip(Theme.isLight() ? "Switch to dark theme" : "Switch to light theme"));
+        String action = Theme.isLight() ? "Switch to dark theme" : "Switch to light theme";
+        themeToggle.setGraphic((Theme.isLight() ? Icon.WEATHER_MOON : Icon.WEATHER_SUNNY).create(18));
+        themeToggle.setTooltip(new Tooltip(action));
+        themeToggle.setAccessibleText(action);
     }
 
     public void addPage(View view, Parent root, Page page) {
@@ -159,6 +163,7 @@ public class ShellController implements AppShell {
         activityDot.setVisible(on);
         activityDot.setManaged(on);
         if (on) {
+            if (Motion.reduced()) return; // the dot stays, it just doesn't pulse
             if (pulse == null) {
                 pulse = new FadeTransition(Duration.millis(700), activityDot);
                 pulse.setFromValue(0.3);

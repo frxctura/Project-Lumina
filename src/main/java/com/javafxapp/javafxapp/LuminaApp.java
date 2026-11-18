@@ -43,6 +43,7 @@ public class LuminaApp extends Application {
         EmulatorInstaller.migrateLegacyInstall();
         com.javafxapp.javafxapp.unpack.Steamless.recover();
         Theme.load();
+        com.javafxapp.javafxapp.ui.shell.Motion.readWindowsSetting();
     }
 
     @Override
@@ -64,6 +65,7 @@ public class LuminaApp extends Application {
         // extra pane for the theme fade to draw on
         Scene scene = new Scene(new StackPane(shellRoot));
         Theme.apply(scene);
+        Ui.trackKeyboardFocus(scene, shellRoot);
         Ui.fasterScrolling(scene, 3);
         stage.initStyle(StageStyle.UNDECORATED);
         stage.setScene(scene);

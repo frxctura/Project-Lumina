@@ -12,10 +12,16 @@
             <Label fx:id="countLabel" styleClass="badge, badge-off" minWidth="-Infinity"/>
             <Region HBox.hgrow="ALWAYS"/>
             <TextField fx:id="searchField" promptText="Search games" prefWidth="180.0"/>
-            <Button fx:id="refreshButton" styleClass="secondary-button" text="REFRESH" minWidth="-Infinity"/>
-            <Button fx:id="addFolderButton" styleClass="secondary-button" text="ADD FOLDER…" minWidth="-Infinity"/>
+            <Button fx:id="refreshButton" styleClass="secondary-button" text="Refresh" minWidth="-Infinity"/>
+            <Button fx:id="addFolderButton" styleClass="secondary-button" text="Add folder…" minWidth="-Infinity"/>
         </HBox>
         <FlowPane fx:id="libraryBar" styleClass="library-chips"/>
+        <HBox styleClass="toolbar">
+            <HBox fx:id="filterBar" styleClass="toolbar"/>
+            <Region HBox.hgrow="ALWAYS"/>
+            <Label fx:id="sortLabel" styleClass="field-label" text="Sort by" minWidth="-Infinity"/>
+            <ComboBox fx:id="sortBox" prefWidth="120.0"/>
+        </HBox>
 
         <StackPane VBox.vgrow="ALWAYS">
             <ScrollPane fx:id="gridScroll" fitToWidth="true" hbarPolicy="NEVER">
@@ -36,7 +42,7 @@
             <Label styleClass="heading" text="Batch queue"/>
             <Label fx:id="queueCountLabel" styleClass="badge, badge-off"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="clearQueueButton" styleClass="secondary-button" text="CLEAR"/>
+            <Button fx:id="clearQueueButton" styleClass="secondary-button" text="Clear"/>
         </HBox>
         <Label fx:id="batchSettings" styleClass="path-label" wrapText="true" minHeight="-Infinity"/>
         <ScrollPane fitToWidth="true" hbarPolicy="NEVER" VBox.vgrow="ALWAYS">
@@ -50,7 +56,7 @@
             </HBox>
             <ProgressBar fx:id="batchProgress" maxWidth="Infinity" progress="0"/>
         </VBox>
-        <Button fx:id="defenderButton" maxWidth="Infinity" styleClass="secondary-button" text="EXCLUDE FROM DEFENDER"/>
-        <Button fx:id="patchButton" maxWidth="Infinity" styleClass="primary-button, accent" text="PATCH"/>
+        <Button fx:id="defenderButton" maxWidth="Infinity" styleClass="secondary-button" text="Exclude from Defender"/>
+        <Button fx:id="patchButton" maxWidth="Infinity" styleClass="primary-button, accent" text="Patch"/>
     </VBox>
 </HBox>

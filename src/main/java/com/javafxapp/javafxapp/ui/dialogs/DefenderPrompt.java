@@ -42,7 +42,7 @@ public final class DefenderPrompt {
                 .message("Defender often quarantines " + flagged + ". Excluding the folders they go into stops that.")
                 .details(paths(folders))
                 .note("Windows will ask for administrator permission. Lumina only asks once per game.")
-                .confirm("ADD EXCLUSION").cancel("SKIP")
+                .confirm("Add exclusion").cancel("Skip")
                 .width(WIDTH)
                 .ask();
         if (add) run(shell, folders, next);
@@ -58,7 +58,7 @@ public final class DefenderPrompt {
                 .message("Defender stops scanning them, so it can't quarantine the emulator DLLs.")
                 .details(paths(folders))
                 .note("Windows will ask for administrator permission.")
-                .confirm("ADD EXCLUSION")
+                .confirm("Add exclusion")
                 .width(WIDTH)
                 .ask();
         if (!add) return;

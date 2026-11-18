@@ -34,7 +34,7 @@ public final class Toaster {
     }
 
     public void show(Kind kind, String text, String actionText, Runnable action) {
-        Label icon = new Label(switch (kind) { case SUCCESS -> "✔"; case ERROR -> "✖"; case INFO -> "ℹ"; });
+        StackPane icon = new StackPane((switch (kind) { case SUCCESS -> Icon.CHECKMARK; case ERROR -> Icon.ERROR_CIRCLE; case INFO -> Icon.INFO; }).create(16));
         icon.getStyleClass().add("toast-icon");
         Label title = new Label(switch (kind) { case SUCCESS -> "Done"; case ERROR -> "That didn't work"; case INFO -> "Heads up"; });
         title.getStyleClass().add("toast-title");
@@ -67,18 +67,18 @@ public final class Toaster {
             content.getChildren().add(link);
         } else if (kind == Kind.ERROR) {
             // so the message can be pasted into a bug report
-            Hyperlink copy = new Hyperlink("COPY");
+            Hyperlink copy = new Hyperlink("Copy");
+            copy.setAccessibleText("Copy this message");
             copy.getStyleClass().add("toast-action");
             copy.setOnAction(e -> {
                 ClipboardContent c = new ClipboardContent();
                 c.putString(text);
                 Clipboard.getSystemClipboard().setContent(c);
-                copy.setText("COPIED");
+                copy.setText("Copied");
             });
             content.getChildren().add(copy);
         }
-        Button close = new Button("✕");
-        close.getStyleClass().add("toast-close");
+        Button close = Ui.iconButton(Icon.DISMISS, 14, "Dismiss: " + title.getText() + ". " + text, "toast-close");
         close.setOnAction(e -> dismiss(toast));
         content.getChildren().add(close);
 
@@ -102,6 +102,10 @@ public final class Toaster {
         if (layer.getChildren().size() >= MAX_TOASTS) layer.getChildren().remove(0);
         layer.getChildren().add(toast);
         Ui.slideIn(toast, 40, 0, 260, 0);
+        // JavaFX has no live regions, so a screen reader can't be told a toast appeared. Its text is on the toast and
+        // on its buttons, so it's read when the user moves there.
+        toast.setAccessibleRole(javafx.scene.AccessibleRole.TEXT);
+        toast.setAccessibleText(title.getText() + ". " + text);
 
         Timeline life = lifetime(left, readingTime(text, kind, actionText != null));
         life.setOnFinished(e -> dismiss(toast));
@@ -131,7 +135,7 @@ public final class Toaster {
         FadeTransition fade = new FadeTransition(Duration.millis(200), toast);
         fade.setToValue(0);
         TranslateTransition slide = new TranslateTransition(Duration.millis(200), toast);
-        slide.setToX(40);
+        slide.setToX(com.javafxapp.javafxapp.ui.shell.Motion.reduced() ? 0 : 40);
         ParallelTransition out = new ParallelTransition(fade, slide);
         out.setOnFinished(e -> layer.getChildren().remove(toast));
         out.play();

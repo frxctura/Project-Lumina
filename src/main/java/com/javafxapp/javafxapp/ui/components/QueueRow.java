@@ -28,11 +28,12 @@ public final class QueueRow extends HBox {
     private final Label nameLabel = new Label();
     private final Label detail = new Label();
     private final ProgressBar progress = new ProgressBar(0);
-    private final Button remove = new Button("✕");
+    private final Button remove;
 
     public QueueRow(Path dir, String name, String appId, Runnable onRemove) {
         this.dir = dir;
         this.appId = appId;
+        this.remove = Ui.iconButton(Icon.DISMISS, 14, "Remove " + name + " from the queue", "queue-remove");
         getStyleClass().addAll("card", "compact", "queue-row");
         setAlignment(Pos.CENTER_LEFT);
 
@@ -41,8 +42,6 @@ public final class QueueRow extends HBox {
         detail.getStyleClass().add("queue-detail");
         progress.setMaxWidth(Double.MAX_VALUE);
         progress.getStyleClass().add("queue-progress");
-        remove.getStyleClass().add("queue-remove");
-        remove.setTooltip(new Tooltip("Remove from queue"));
         remove.setOnAction(e -> onRemove.run());
 
         VBox text = Layout.column("queue-text", nameLabel, detail, progress);
@@ -68,6 +67,10 @@ public final class QueueRow extends HBox {
     public void setName(String name) {
         this.name = name;
         nameLabel.setText(name);
+        if (remove != null) {
+            remove.setAccessibleText("Remove " + name + " from the queue");
+            remove.setTooltip(new Tooltip("Remove " + name + " from the queue"));
+        }
         Tooltip.install(nameLabel, new Tooltip(name + "\n" + dir));
     }
 

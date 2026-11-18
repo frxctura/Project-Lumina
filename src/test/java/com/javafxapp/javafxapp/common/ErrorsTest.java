@@ -11,7 +11,9 @@ class ErrorsTest {
 
     @Test
     void neverShowsTheWordNull() {
-        assertEquals("Something went wrong (NullPointerException).", Errors.describe(new NullPointerException()));
+        String npe = Errors.describe(new NullPointerException());
+        assertTrue(npe.startsWith("An unexpected error happened inside Lumina (NullPointerException)."), npe);
+        assertTrue(npe.contains("Copy diagnostics"), "says what to do about it: " + npe);
         assertFalse(Errors.describe(new IllegalStateException((String) null)).contains("null"));
         assertFalse(Errors.describe(new IOException("  ")).isBlank());
     }

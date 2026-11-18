@@ -1,4 +1,4 @@
-.library-grid { -fx-hgap: 16; -fx-vgap: 16; -fx-padding: 4 4 16 0; }
+.library-grid { -fx-hgap: 16; -fx-vgap: 16; -fx-padding: 6 6 16 6; }
 .game-tile { -fx-padding: 0; }
 .game-tile-card {
     -fx-background-color: -surface-2;
@@ -20,15 +20,12 @@
 .tile-meta { -fx-spacing: 8; -fx-alignment: center-left; }
 .tile-cover-placeholder { -fx-background-color: linear-gradient(to bottom right, -surface-3, -control); }
 .tile-initial { -fx-font-family: "Nunito Black"; -fx-font-size: 32px; -fx-text-fill: -text-dim; }
-.tile-name { -fx-font-family: "Nunito SemiBold"; -fx-font-size: 13px; }
+.tile-name { -fx-font-family: "Nunito SemiBold"; -fx-font-size: 14px; }
 .tile-size { -fx-text-fill: -text-dim; -fx-font-size: 12px; }
 
 .tile-check {
     -fx-min-width: 24; -fx-min-height: 24; -fx-max-width: 24; -fx-max-height: 24;
     -fx-alignment: center;
-    -fx-font-size: 11px;
-    -fx-font-family: "Nunito Black";
-    -fx-text-fill: transparent;
     -fx-background-color: rgba(0, 0, 0, 0.45);
     -fx-background-radius: 999;
     -fx-border-color: -on-accent;
@@ -37,9 +34,11 @@
     -fx-opacity: 0;
 }
 .game-tile:hover .tile-check { -fx-opacity: 1; }
+.tile-check .icon { -fx-fill: transparent; }
+.game-tile:selected .tile-check .icon { -fx-fill: -on-accent; }
+.game-tile:focused .tile-check { -fx-opacity: 1; }
 .game-tile:selected .tile-check {
     -fx-opacity: 1;
-    -fx-text-fill: -on-accent;
     -fx-background-color: -accent;
     -fx-border-color: -accent;
 }
@@ -57,7 +56,7 @@
     -fx-font-size: 12px;
     -fx-text-fill: -text-dim;
 }
-.queue-name { -fx-font-family: "Nunito SemiBold"; -fx-font-size: 13px; }
+.queue-name { -fx-font-family: "Nunito SemiBold"; -fx-font-size: 14px; }
 .queue-detail { -fx-text-fill: -text-dim; -fx-font-size: 12px; }
 
 .queue-row:running { -fx-border-color: -accent; -fx-border-width: 0 0 0 3; -fx-border-radius: 10 0 0 10; }
@@ -71,8 +70,9 @@
 
 .queue-remove {
     -fx-background-color: transparent;
-    -fx-text-fill: -text-dim;
-    -fx-padding: 4 8;
+    -fx-background-radius: 6;
+    -fx-min-width: 28; -fx-min-height: 28;
+    -fx-padding: 0;
     -fx-cursor: hand;
 }
-.queue-remove:hover { -fx-text-fill: -text; }
+.queue-remove:hover { -fx-background-color: -hover-tint; }

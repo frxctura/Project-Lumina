@@ -77,6 +77,7 @@ public class StepIndicator extends HBox {
         active = index;
         pulse.stop();
         dots.forEach(d -> { d.setScaleX(1); d.setScaleY(1); });
+        if (com.javafxapp.javafxapp.ui.shell.Motion.reduced()) return;
         pulse.setNode(dots.get(index));
         pulse.playFromStart();
     }
@@ -98,7 +99,12 @@ public class StepIndicator extends HBox {
         for (PseudoClass pc : List.of(ACTIVE, DONE, FAILED)) step.pseudoClassStateChanged(pc, pc == state);
         dot.setScaleX(1);
         dot.setScaleY(1);
-        dot.setText(state == DONE ? "✓" : state == FAILED ? "✕" : String.valueOf(i + 1));
+        // done and failed are drawn icons, so they look the same on every machine; the number stays text
+        boolean mark = state == DONE || state == FAILED;
+        dot.setText(mark ? "" : String.valueOf(i + 1));
+        dot.setGraphic(mark ? (state == DONE ? Icon.CHECKMARK : Icon.DISMISS).create(14) : null);
+        String name = names.get(i);
+        dot.setAccessibleText(name + ": " + (state == DONE ? "done" : state == FAILED ? "failed" : state == ACTIVE ? "in progress" : "waiting"));
         if (i > 0) lines.get(i - 1).pseudoClassStateChanged(DONE, state == DONE || state == ACTIVE || state == FAILED);
     }
 }

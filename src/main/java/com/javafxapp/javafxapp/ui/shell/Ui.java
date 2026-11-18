@@ -9,6 +9,9 @@ import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.control.*;
+import javafx.css.PseudoClass;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -81,6 +84,15 @@ public final class Ui {
     public static void slideIn(Node node, double dx, double dy, int ms, int delayMs) {
         node.setVisible(true);
         node.setOpacity(0);
+        if (Motion.reduced()) {
+            // no movement, only the fade, and no stagger
+            node.setTranslateX(0);
+            node.setTranslateY(0);
+            FadeTransition fade = new FadeTransition(Duration.millis(Math.min(ms, 150)), node);
+            fade.setToValue(1);
+            play(node, fade);
+            return;
+        }
         node.setTranslateX(dx);
         node.setTranslateY(dy);
         FadeTransition fade = new FadeTransition(Duration.millis(ms), node);
@@ -107,6 +119,7 @@ public final class Ui {
     }
 
     public static void pop(Node node) {
+        if (Motion.reduced()) return;
         ScaleTransition up = new ScaleTransition(Duration.millis(120), node);
         up.setToX(1.08);
         up.setToY(1.08);
@@ -130,6 +143,10 @@ public final class Ui {
     }
 
     public static void countUp(Label label, long target, LongFunction<String> format) {
+        if (Motion.reduced()) {
+            label.setText(format.apply(target));
+            return;
+        }
         var value = new WritableValue<Number>() {
             long v;
             public Number getValue() { return v; }
@@ -157,6 +174,42 @@ public final class Ui {
         };
     }
 
+    private static final PseudoClass KEYBOARD = PseudoClass.getPseudoClass("keyboard");
+    private static boolean keyboardInUse;
+
+    /**
+     * Focus rings show only while someone is using the keyboard: Tab or an arrow key puts {@code :keyboard} on
+     * {@code root} (the node with the app-root style), a mouse click takes it off. Every window does this, and a new
+     * window starts in whatever mode the last one was in, so a dialog opened from the keyboard shows its ring at once.
+     */
+    public static void trackKeyboardFocus(Scene scene, Node root) {
+        root.pseudoClassStateChanged(KEYBOARD, keyboardInUse);
+        scene.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
+            switch (e.getCode()) {
+                case TAB, UP, DOWN, LEFT, RIGHT, HOME, END, PAGE_UP, PAGE_DOWN -> {
+                    keyboardInUse = true;
+                    root.pseudoClassStateChanged(KEYBOARD, true);
+                }
+                default -> { }
+            }
+        });
+        scene.addEventFilter(MouseEvent.MOUSE_PRESSED, e -> {
+            keyboardInUse = false;
+            root.pseudoClassStateChanged(KEYBOARD, false);
+        });
+    }
+
+    /** A button that only shows an icon. {@code name} is what a screen reader says, and the tooltip. */
+    public static Button iconButton(com.javafxapp.javafxapp.ui.components.Icon icon, double size, String name, String... styles) {
+        Button b = new Button();
+        b.setGraphic(icon.create(size));
+        b.getStyleClass().addAll(styles);
+        b.setAccessibleText(name);
+        b.setTooltip(new Tooltip(name));
+        b.setMnemonicParsing(false);
+        return b;
+    }
+
     public static Prompt prompt(Window owner) {
         return new Prompt(owner);
     }
@@ -170,6 +223,7 @@ public final class Ui {
         pane.getScene().setFill(null);
         for (String css : new String[]{"styles.css", "alertstyles.css"}) pane.getStylesheets().add(stylesheet(css));
         pane.getStyleClass().addAll("app-root", "lumina-alert");
+        trackKeyboardFocus(pane.getScene(), pane);
         Theme.apply(pane);
         return alert;
     }

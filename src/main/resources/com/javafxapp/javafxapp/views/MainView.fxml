@@ -12,12 +12,12 @@
     <StackPane HBox.hgrow="ALWAYS">
         <VBox fx:id="selectView" alignment="CENTER" styleClass="page">
             <VBox fx:id="dropZone" styleClass="drop-zone" maxWidth="480">
-                <Label styleClass="drop-icon" text="⇩"/>
+                <StackPane fx:id="dropIcon" styleClass="drop-icon"/>
                 <VBox alignment="CENTER" styleClass="stack">
                     <Label styleClass="title" text="Drop a game folder here"/>
                     <Label styleClass="muted" text="or pick one manually"/>
                 </VBox>
-                <Button fx:id="selectDirButton" prefWidth="240.0" styleClass="primary-button, accent" text="SELECT DIRECTORY"/>
+                <Button fx:id="selectDirButton" prefWidth="240.0" styleClass="primary-button, accent" text="Select a game folder"/>
             </VBox>
             <VBox fx:id="recentBox" styleClass="gap-2" maxWidth="480">
                 <Label styleClass="section-label" text="RECENT"/>
@@ -30,22 +30,22 @@
                 <Label fx:id="readyTitle" styleClass="title"/>
                 <Label fx:id="patchBadge" styleClass="badge" minWidth="-Infinity" visible="false"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <Button fx:id="changeDirButton" styleClass="secondary-button" text="CHANGE"/>
+                <Button fx:id="changeDirButton" styleClass="secondary-button" text="Change"/>
             </HBox>
 
             <HBox styleClass="gap-4" alignment="CENTER_LEFT">
                 <HBox styleClass="field-group">
-                    <Label styleClass="field-label" text="Emulator"/>
+                    <Label fx:id="emulatorLabel" styleClass="field-label" text="Emulator"/>
                     <ComboBox fx:id="emulatorBox" prefWidth="130.0"/>
-                    <Button fx:id="emulatorSettingsButton" styleClass="secondary-button, icon-button" text="⚙" mnemonicParsing="false"/>
+                    <Button fx:id="emulatorSettingsButton" styleClass="secondary-button, icon-button" mnemonicParsing="false"/>
                 </HBox>
                 <HBox styleClass="field-group">
-                    <Label styleClass="field-label" text="Steam App ID"/>
+                    <Label fx:id="appIdLabel" styleClass="field-label" text="Steam App ID"/>
                     <TextField fx:id="appIdField" prefWidth="110.0" promptText="optional"/>
                 </HBox>
             </HBox>
-            <CheckBox fx:id="backupCheckBox" mnemonicParsing="false" styleClass="app-check" text="Back up original steam_api DLLs (.bak)"/>
-            <CheckBox fx:id="unpackCheckBox" mnemonicParsing="false" styleClass="app-check" text="Unpack SteamStub DRM from the game's .exe (Steamless)"/>
+            <CheckBox fx:id="backupCheckBox" mnemonicParsing="false" styleClass="app-check" text="Keep a backup of the original files"/>
+            <CheckBox fx:id="unpackCheckBox" mnemonicParsing="false" styleClass="app-check" text="Remove SteamStub DRM from the game (Steamless)"/>
 
             <VBox fx:id="progressBox" styleClass="progress-box">
                 <StepIndicator fx:id="steps"/>
@@ -56,19 +56,21 @@
                 <Label fx:id="progressDetail" styleClass="progress-detail"/>
             </VBox>
 
-            <ListView fx:id="logList" styleClass="log-list" VBox.vgrow="ALWAYS" focusTraversable="false"/>
+            <VBox fx:id="resultCard" styleClass="result-card" visible="false" managed="false"/>
+
+            <ListView fx:id="logList" styleClass="log-list" VBox.vgrow="ALWAYS"/>
 
             <HBox styleClass="toolbar">
-                <Button fx:id="backButton" styleClass="secondary-button" text="BACK"/>
+                <Button fx:id="backButton" styleClass="secondary-button" text="Back"/>
                 <Region HBox.hgrow="ALWAYS"/>
-                <Button fx:id="restoreButton" styleClass="secondary-button" text="RESTORE ORIGINALS"/>
-                <Button fx:id="openFolderButton" styleClass="secondary-button" text="OPEN FOLDER"/>
-                <Button fx:id="crackButton" prefWidth="180.0" styleClass="primary-button, accent" text="START CRACKING"/>
+                <Button fx:id="restoreButton" styleClass="secondary-button" text="Restore originals"/>
+                <Button fx:id="openFolderButton" styleClass="secondary-button" text="Open folder"/>
+                <Button fx:id="crackButton" prefWidth="180.0" styleClass="primary-button, accent" text="Patch game"/>
             </HBox>
         </VBox>
     </StackPane>
 
-    <VBox prefWidth="268.0" minWidth="268.0" styleClass="side-panel, info-panel">
+    <VBox fx:id="infoPanel" prefWidth="268.0" minWidth="268.0" styleClass="side-panel, info-panel" visible="false" managed="false">
         <Label maxWidth="Infinity" alignment="CENTER" styleClass="heading" text="Game information"/>
         <Separator/>
         <VBox alignment="CENTER" styleClass="gap-2">

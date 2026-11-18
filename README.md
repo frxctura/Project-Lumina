@@ -28,9 +28,9 @@ Point it at a game folder, or pick a game from your Steam library, and hit start
 
 ## Getting started
 
-1. Grab `LuminaSetup-1.5.exe` from the [latest release](../../releases/latest) and run it.
+1. Grab `LuminaSetup-1.6.exe` from the [latest release](../../releases/latest) and run it.
 2. Open Lumina and pick a game.
-3. Hit start. The first time, it downloads the emulator itself, so there's nothing to set up.
+3. Hit Patch game. The first time, it downloads the emulator itself, so there's nothing to set up.
 
 Prefer building it yourself? Skip to [Building](#building).
 
@@ -47,6 +47,7 @@ Prefer building it yourself? Skip to [Building](#building).
 | **History** | Every patch and restore, with where its backups are, how much space they take, and one-click open, restore and clean-up. |
 | **Safety checks** | Warns you if the game is running, checks you have the disk space first, and notices when antivirus eats a DLL. |
 | **Themes** | Dark, light, or follow Windows. |
+| **Keyboard and screen readers** | Everything works from the keyboard with a visible focus ring (arrow keys and Space in the Library too), buttons and fields are named for screen readers, every color meets WCAG AA contrast, and animations follow Windows' "Animation effects" setting or can be turned down in Settings. |
 
 ## Screenshots
 
@@ -54,7 +55,7 @@ Prefer building it yourself? Skip to [Building](#building).
   <tr>
     <td width="50%">
       <img src="screenshots/home.png" alt="Home page after patching a game">
-      <br><b>Home</b><br>A step tracker and a live log while it works.
+      <br><b>Home</b><br>Pick an emulator, hit Patch game, and watch each step and the log. What happened stays on the page afterwards.
     </td>
     <td width="50%">
       <img src="screenshots/queue.png" alt="Library with four games in the batch queue">
@@ -75,7 +76,7 @@ Prefer building it yourself? Skip to [Building](#building).
 
 Before it touches anything, it shows you what it's about to do:
 
-<p align="center"><img src="screenshots/preview.png" alt="The confirmation dialog before patching" width="340"></p>
+<p align="center"><img src="screenshots/preview.png" alt="The confirmation dialog before patching" width="420"></p>
 
 And it looks fine in light mode too:
 
@@ -145,6 +146,8 @@ gradlew installer    build build/installer/LuminaSetup-<version>.exe
 ```
 
 The installer task needs [Inno Setup](https://jrsoftware.org/isinfo.php). `scoop install inno-setup` is the easiest way to get it. Lumina keeps its data in `%LOCALAPPDATA%\Lumina`: the downloaded emulators, your history, and a log file if you turn that on.
+
+For screenshots, set `LUMINA_STEAM_DIR` to a demo Steam folder and Lumina shows that library instead of yours. The icons come from Microsoft's Fluent UI System Icons (MIT), see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Problems
 

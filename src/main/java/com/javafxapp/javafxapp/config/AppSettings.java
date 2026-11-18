@@ -28,6 +28,7 @@ public final class AppSettings {
     private static final String RECENT_GAMES = "recentGames";
     private static final String DEFENDER_ASKED = "defenderAsked";
     private static final String THEME = "theme";
+    private static final String MOTION = "motion";
     private static final String WINDOW_X = "windowX";
     private static final String WINDOW_Y = "windowY";
     private static final String WINDOW_WIDTH = "windowWidth";
@@ -131,6 +132,19 @@ public final class AppSettings {
 
     public static void setTheme(Theme theme) { PREFS.put(THEME, theme.name()); }
 
+    /** Animations: follow Windows (Settings, Accessibility, Visual effects), always on, or reduced. */
+    public enum Motion { SYSTEM, FULL, REDUCED }
+
+    public static Motion getMotion() {
+        try {
+            return Motion.valueOf(PREFS.get(MOTION, Motion.SYSTEM.name()));
+        } catch (IllegalArgumentException e) {
+            return Motion.SYSTEM;
+        }
+    }
+
+    public static void setMotion(Motion motion) { PREFS.put(MOTION, motion.name()); }
+
     public record WindowBounds(double x, double y, double width, double height) {}
 
     public static Optional<WindowBounds> getWindowBounds() {
@@ -168,6 +182,7 @@ public final class AppSettings {
         setPreviewBeforePatch(true);
         setUnpackDrm(false);
         setEmulator(Emulator.GOLDBERG);
+        setMotion(Motion.SYSTEM);
         PREFS.remove(DEFENDER_ASKED);
     }
 

@@ -13,6 +13,7 @@ import com.javafxapp.javafxapp.patching.BatchJob;
 import com.javafxapp.javafxapp.patching.CrackJob;
 import com.javafxapp.javafxapp.patching.PatchDetector;
 import com.javafxapp.javafxapp.ui.components.GameTile;
+import com.javafxapp.javafxapp.ui.components.Icon;
 import com.javafxapp.javafxapp.ui.components.QueueRow;
 import com.javafxapp.javafxapp.ui.components.Toaster;
 import com.javafxapp.javafxapp.ui.dialogs.DefenderPrompt;
@@ -24,7 +25,9 @@ import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
 
@@ -41,6 +44,34 @@ public class LibraryController implements Page {
     private static final int STAGGER_MS = 30, MAX_STAGGER_MS = 450;
 
     private record Inspection(PatchDetector.Report report, long size) {}
+
+    /** The filter chips above the grid. Games still being checked only show under All. */
+    private enum Filter {
+        ALL("All"), PATCHED("Patched"), ORIGINAL("Original"), ATTENTION("Needs attention");
+
+        final String label;
+
+        Filter(String label) { this.label = label; }
+
+        boolean test(Optional<PatchDetector.State> state) {
+            return switch (this) {
+                case ALL -> true;
+                case PATCHED -> state.filter(s -> s == PatchDetector.State.PATCHED).isPresent();
+                case ORIGINAL -> state.filter(s -> s == PatchDetector.State.ORIGINAL).isPresent();
+                case ATTENTION -> state.filter(s -> s == PatchDetector.State.MIXED).isPresent();
+            };
+        }
+    }
+
+    private enum Sort {
+        NAME("Name"), SIZE("Size");
+
+        final String label;
+
+        Sort(String label) { this.label = label; }
+
+        @Override public String toString() { return label; }
+    }
 
     private final ExecutorService inspector = Executors.newFixedThreadPool(2, r -> {
         Thread t = new Thread(r, "library-inspect");
@@ -64,9 +95,14 @@ public class LibraryController implements Page {
     private List<QueueRow> batchRows = List.of();
     private CrackJob currentJob;
     private int finished;
+    private Filter filter = Filter.ALL;
 
     @FXML private Label countLabel, emptyIcon, emptyTitle, emptyText, queueCountLabel, batchSettings, batchCount, batchPercent;
     @FXML private TextField searchField;
+    @FXML private HBox filterBar;
+    @FXML private ComboBox<Sort> sortBox;
+    @FXML private Label sortLabel;
+    @FXML private ScrollPane gridScroll;
     @FXML private Button refreshButton, addFolderButton, emptyAction, clearQueueButton, defenderButton, patchButton;
     @FXML private FlowPane libraryBar, grid;
     @FXML private VBox emptyState, queuePanel, queueList, batchProgressBox;
@@ -75,9 +111,12 @@ public class LibraryController implements Page {
     @FXML
     public void initialize() {
         searchField.textProperty().addListener((o, a, v) -> render());
+        searchField.setAccessibleText("Search games");
+        setUpFilters();
+        grid.addEventFilter(KeyEvent.KEY_PRESSED, this::moveBetweenTiles);
         refreshButton.setOnAction(e -> rescan());
         addFolderButton.setOnAction(e -> chooseFolder());
-        emptyAction.setText("ADD FOLDER…");
+        emptyAction.setText("Add folder…");
         emptyAction.setOnAction(e -> chooseFolder());
         clearQueueButton.setOnAction(e -> clearQueue());
         defenderButton.setOnAction(e -> DefenderPrompt.addFor(shell, List.copyOf(queue.keySet())));
@@ -166,8 +205,12 @@ public class LibraryController implements Page {
         if (scan == null) return;
         String query = searchField.getText().trim().toLowerCase(Locale.ROOT);
         List<SteamLibrary.Game> all = allGames();
+        Comparator<SteamLibrary.Game> order = sortBox.getValue() == Sort.SIZE
+                ? Comparator.comparingLong((SteamLibrary.Game g) -> -g.size()).thenComparing(SteamLibrary.Game::name, String.CASE_INSENSITIVE_ORDER)
+                : Comparator.comparing(SteamLibrary.Game::name, String.CASE_INSENSITIVE_ORDER);
         List<SteamLibrary.Game> shown = all.stream()
                 .filter(g -> g.name().toLowerCase(Locale.ROOT).contains(query))
+                .sorted(order)
                 .toList();
         countLabel.setText(all.size() + (all.size() == 1 ? " game" : " games"));
 
@@ -179,10 +222,10 @@ public class LibraryController implements Page {
                 tile = createTile(game);
                 Ui.reveal(tile, 260, Math.min(fresh++ * STAGGER_MS, MAX_STAGGER_MS));
             }
-            nodes.add(tile);
+            if (filter.test(tile.state())) nodes.add(tile);
         }
         grid.getChildren().setAll(nodes);
-        updateEmptyState(all.isEmpty(), shown.isEmpty(), query);
+        updateEmptyState(all.isEmpty(), nodes.isEmpty(), query);
     }
 
     private void updateEmptyState(boolean noGames, boolean noneShown, String query) {
@@ -193,20 +236,23 @@ public class LibraryController implements Page {
         boolean steamMissing = scan.steam().isEmpty();
         long offline = scan.libraries().stream().filter(l -> !l.online()).count();
         if (!noGames) {
-            showEmpty("⌕", "No matches", "No game name contains \"" + query + "\".", false);
+            showEmpty(Icon.SEARCH, "No matches", query.isEmpty()
+                    ? "No game is in \"" + filter.label + "\" right now."
+                    : "No game name contains \"" + query + "\"" + (filter == Filter.ALL ? "." : " in \"" + filter.label + "\"."), false);
         } else if (steamMissing) {
-            showEmpty("⚠", "Steam not found",
+            showEmpty(Icon.WARNING, "Steam not found",
                     "Lumina could not find a Steam installation. Add game folders by hand, or drop several folders on Home to queue them.", true);
         } else {
-            showEmpty("∅", "No games installed",
+            showEmpty(Icon.FOLDER, "No games installed",
                     "None of your Steam library folders contain installed games"
                             + (offline > 0 ? ", and " + offline + " library folder(s) are offline." : ".")
                             + " You can still add game folders by hand.", true);
         }
     }
 
-    private void showEmpty(String icon, String title, String text, boolean action) {
-        emptyIcon.setText(icon);
+    private void showEmpty(Icon icon, String title, String text, boolean action) {
+        emptyIcon.setText("");
+        emptyIcon.setGraphic(icon.create(36));
         emptyTitle.setText(title);
         emptyText.setText(text);
         emptyAction.setVisible(action);
@@ -290,6 +336,7 @@ public class LibraryController implements Page {
             if (tiles.get(game.dir()) != tile) return;
             tile.showReport(task.getValue().report());
             tile.setSize(task.getValue().size());
+            if (filter != Filter.ALL) render(); // it may belong in the chosen filter now
         });
         task.setOnFailed(e -> {
             if (tiles.get(game.dir()) == tile) tile.showError(Errors.describe(task.getException()));
@@ -321,8 +368,78 @@ public class LibraryController implements Page {
         updateQueuePanel();
     }
 
+    // no "are you sure": it's undone in one click instead
     private void clearQueue() {
-        List.copyOf(queue.keySet()).forEach(this::removeFromQueue);
+        List<SteamLibrary.Game> removed = new ArrayList<>();
+        for (QueueRow row : List.copyOf(queue.values())) {
+            if (batch != null && batchRows.contains(row)) continue;
+            removed.add(new SteamLibrary.Game(row.appId(), row.name(), row.dir, -1, Optional.empty()));
+            removeFromQueue(row.dir);
+        }
+        if (removed.isEmpty()) return;
+        shell.toast(Toaster.Kind.INFO, "Cleared " + games(removed.size()) + " from the queue.", "Undo", () -> {
+            for (SteamLibrary.Game g : removed)
+                if (!queue.containsKey(g.dir()) && Files.isDirectory(g.dir())) addToQueue(knownGame(g.dir()).orElse(g));
+        });
+    }
+
+    private void setUpFilters() {
+        ToggleGroup chips = new ToggleGroup();
+        for (Filter f : Filter.values()) {
+            ToggleButton chip = new ToggleButton(f.label);
+            chip.getStyleClass().add("filter-chip");
+            chip.setToggleGroup(chips);
+            chip.setUserData(f);
+            chip.setSelected(f == filter);
+            chip.setMnemonicParsing(false);
+            filterBar.getChildren().add(chip);
+        }
+        chips.selectedToggleProperty().addListener((o, old, now) -> {
+            if (now == null) {
+                old.setSelected(true);
+                return;
+            }
+            filter = (Filter) now.getUserData();
+            render();
+        });
+        sortBox.getItems().setAll(Sort.values());
+        sortBox.setValue(Sort.NAME);
+        sortBox.valueProperty().addListener((o, a, v) -> render());
+        sortLabel.setLabelFor(sortBox);
+    }
+
+    /** Arrow keys move between tiles like in a file explorer: left and right in reading order, up and down by row. */
+    private void moveBetweenTiles(KeyEvent e) {
+        if (!(e.getTarget() instanceof GameTile from)) return;
+        List<javafx.scene.Node> nodes = grid.getChildren();
+        int index = nodes.indexOf(from);
+        if (index < 0) return;
+        long perRow = Math.max(1, nodes.stream().filter(n -> n.getLayoutY() == nodes.get(0).getLayoutY()).count());
+        int target = switch (e.getCode()) {
+            case LEFT -> index - 1;
+            case RIGHT -> index + 1;
+            case UP -> index - (int) perRow;
+            case DOWN -> index + (int) perRow;
+            case HOME -> 0;
+            case END -> nodes.size() - 1;
+            default -> -2;
+        };
+        if (target == -2) return;
+        e.consume();
+        if (target < 0 || target >= nodes.size()) return;
+        javafx.scene.Node to = nodes.get(target);
+        to.requestFocus();
+        ensureVisible(to);
+    }
+
+    private void ensureVisible(javafx.scene.Node node) {
+        double contentHeight = grid.getLayoutBounds().getHeight();
+        double viewport = gridScroll.getViewportBounds().getHeight();
+        if (contentHeight <= viewport) return;
+        double top = node.getBoundsInParent().getMinY(), bottom = node.getBoundsInParent().getMaxY();
+        double shownTop = gridScroll.getVvalue() * (contentHeight - viewport);
+        if (top < shownTop) gridScroll.setVvalue(top / (contentHeight - viewport));
+        else if (bottom > shownTop + viewport) gridScroll.setVvalue((bottom - viewport) / (contentHeight - viewport));
     }
 
     private void syncSelection(Path dir) {
@@ -345,8 +462,8 @@ public class LibraryController implements Page {
         if (batch != null) return;
         long pending = queue.values().stream().filter(QueueRow::isPending).count();
         long retries = queue.values().stream().filter(QueueRow::isRetry).count();
-        String games = pending == 1 ? " GAME" : " GAMES";
-        patchButton.setText(pending == 0 ? "ALL DONE" : (retries == pending ? "RETRY " : "PATCH ") + pending + games);
+        String games = pending == 1 ? " game" : " games";
+        patchButton.setText(pending == 0 ? "All done" : (retries == pending ? "Retry " : "Patch ") + pending + games);
         patchButton.setDisable(pending == 0);
     }
 
@@ -382,7 +499,7 @@ public class LibraryController implements Page {
             if (Ui.prompt(shell.window())
                     .title("Patch " + games(rows.size()) + " with " + settings.emulator() + "?")
                     .message("Running games are patched at the end, once they close.")
-                    .confirm("PATCH").ask()) runBatch(rows, settings);
+                    .confirm("Patch").ask()) runBatch(rows, settings);
             return;
         }
         previewBatch(rows, settings);
@@ -392,7 +509,7 @@ public class LibraryController implements Page {
 
     private void previewBatch(List<QueueRow> rows, BatchJob.Settings settings) {
         patchButton.setDisable(true);
-        patchButton.setText("CHECKING…");
+        patchButton.setText("Checking…");
         Task<List<GamePlan>> task = new Task<>() {
             @Override
             protected List<GamePlan> call() {
@@ -458,7 +575,7 @@ public class LibraryController implements Page {
                 .message(message)
                 .details(lines)
                 .note("Running games are patched at the end, once they close.")
-                .confirm("PATCH").width(520)
+                .confirm("Patch").width(520)
                 .ask();
     }
 
@@ -515,10 +632,10 @@ public class LibraryController implements Page {
         if (batch == null || !Ui.prompt(shell.window())
                 .title("Stop the batch?")
                 .message("The game being patched right now is put back how it was. Games that already finished stay patched.")
-                .confirm("STOP").cancel("KEEP GOING").destructive()
+                .confirm("Stop").cancel("Keep going").destructive()
                 .ask()) return;
         batch.stop();
-        patchButton.setText("STOPPING…");
+        patchButton.setText("Stopping…");
         patchButton.setDisable(true);
     }
 
@@ -567,7 +684,7 @@ public class LibraryController implements Page {
         patchButton.setDisable(false);
         patchButton.getStyleClass().removeAll("accent", "danger");
         patchButton.getStyleClass().add(busy ? "danger" : "accent");
-        if (busy) patchButton.setText("STOP");
+        if (busy) patchButton.setText("Stop");
         updateQueuePanel();
     }
 }

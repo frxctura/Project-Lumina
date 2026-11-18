@@ -13,7 +13,8 @@ public final class Errors {
         if (msg == null || msg.isBlank()) {
             // a NullPointerException and the like have no message, and "null" tells nobody anything
             Throwable cause = t.getCause();
-            return cause != null && cause != t ? describe(cause) : "Something went wrong (" + t.getClass().getSimpleName() + ").";
+            return cause != null && cause != t ? describe(cause) : "An unexpected error happened inside Lumina (" + t.getClass().getSimpleName() + "). "
+                    + "Settings has a Copy diagnostics button, paste that into an issue on GitHub so it can be fixed.";
         }
         if (msg.toLowerCase().contains("virus") || msg.toLowerCase().contains("unwanted software"))
             return "Blocked by antivirus. Add an exclusion for the Lumina folder and the game directory.";

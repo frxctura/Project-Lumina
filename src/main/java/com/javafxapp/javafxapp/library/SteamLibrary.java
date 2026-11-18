@@ -49,6 +49,10 @@ public final class SteamLibrary {
     }
 
     static Optional<Path> findSteam() {
+        // for screenshots and testing: point Lumina at a demo Steam folder instead of the real one
+        String override = System.getenv("LUMINA_STEAM_DIR");
+        if (override != null && !override.isBlank())
+            return Optional.of(Path.of(override.strip())).filter(p -> Files.isDirectory(p.resolve("steamapps")));
         Optional<Path> fromRegistry = Optional.empty();
         try {
             fromRegistry = registryValue("HKCU\\Software\\Valve\\Steam", "SteamPath").map(Path::of);

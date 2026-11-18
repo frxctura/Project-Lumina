@@ -11,8 +11,8 @@
             <Label styleClass="title" text="History"/>
             <Label fx:id="countLabel" styleClass="badge, badge-off"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="cleanupButton" styleClass="secondary-button" text="CLEAN UP…"/>
-            <Button fx:id="clearButton" styleClass="secondary-button" text="CLEAR HISTORY"/>
+            <Button fx:id="cleanupButton" styleClass="secondary-button" text="Clean up…"/>
+            <Button fx:id="clearButton" styleClass="secondary-button" text="Clear history"/>
         </HBox>
         <Label styleClass="muted" wrapText="true" minHeight="-Infinity"
                text="Every patch and restore, and where its backups live. File backups (.bak, _o.dll, .steamstub.bak) sit next to the original file inside the game folder; full folder copies go to the directory chosen in Settings."/>
@@ -21,7 +21,7 @@
     <HBox styleClass="card, compact, toolbar">
         <Label fx:id="summaryLabel" styleClass="heading" text="Measuring backups..."/>
         <Region HBox.hgrow="ALWAYS"/>
-        <Button fx:id="openBackupFolderButton" styleClass="secondary-button" text="OPEN BACKUP FOLDER"/>
+        <Button fx:id="openBackupFolderButton" styleClass="secondary-button" text="Open backup folder"/>
     </HBox>
 
     <HBox styleClass="toolbar">

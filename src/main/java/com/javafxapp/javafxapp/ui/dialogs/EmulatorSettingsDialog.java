@@ -58,10 +58,10 @@ public final class EmulatorSettingsDialog {
     private final CheckBox unlockAll = new CheckBox("Unlock all DLC");
     private final Label dlcCount = new Label();
     private final Label fetchStatus = new Label();
-    private final Button fetchButton = new Button("FETCH FROM STEAM");
+    private final Button fetchButton = new Button("Fetch from Steam");
     private final Label interfacesStatus = new Label();
-    private final Button generateInterfaces = new Button("GENERATE");
-    private final Button removeInterfaces = new Button("REMOVE");
+    private final Button generateInterfaces = new Button("Generate");
+    private final Button removeInterfaces = new Button("Remove");
     private boolean saved;
     private Task<?> fetchTask;
 
@@ -82,6 +82,7 @@ public final class EmulatorSettingsDialog {
         Theme.apply(root);
 
         Scene scene = new Scene(root, 640, emulator.supportsInterfacesFile() ? 650 : 560);
+        Ui.trackKeyboardFocus(scene, root);
         scene.setOnKeyPressed(e -> { if (e.getCode() == KeyCode.ESCAPE) stage.close(); });
         stage.setScene(scene);
         stage.setOnHidden(e -> { if (fetchTask != null) fetchTask.cancel(); });
@@ -107,6 +108,7 @@ public final class EmulatorSettingsDialog {
     private GridPane form() {
         username.setPromptText("Emulator default");
         steamId.setPromptText("Generated automatically");
+        offline.setMnemonicParsing(false);
         steamId.setTextFormatter(new TextFormatter<String>(c -> c.getControlNewText().matches("\\d{0,17}") ? c : null));
         language.getItems().setAll(EmulatorConfig.LANGUAGES);
         language.setEditable(true);
@@ -199,9 +201,9 @@ public final class EmulatorSettingsDialog {
         dlcCount.getStyleClass().addAll("badge", "badge-off");
         dlcs.addListener((ListChangeListener<DlcRow>) c -> updateCount());
 
-        Button add = new Button("ADD");
-        Button remove = new Button("REMOVE");
-        Button clear = new Button("CLEAR");
+        Button add = new Button("Add");
+        Button remove = new Button("Remove");
+        Button clear = new Button("Clear");
         for (Button b : List.of(fetchButton, add, remove, clear)) b.getStyleClass().add("secondary-button");
         fetchButton.setDisable(!SteamStore.isValidAppId(appId));
         fetchButton.setTooltip(new Tooltip(SteamStore.isValidAppId(appId)
@@ -259,14 +261,14 @@ public final class EmulatorSettingsDialog {
     }
 
     private HBox footer() {
-        Button openFolder = new Button("OPEN FOLDER");
+        Button openFolder = new Button("Open folder");
         openFolder.getStyleClass().add("secondary-button");
         openFolder.setOnAction(e -> Ui.openFolder(settingsDirs.get(0).getParent()));
-        Button cancel = new Button("CANCEL");
+        Button cancel = new Button("Cancel");
         cancel.getStyleClass().add("secondary-button");
         cancel.setCancelButton(true);
         cancel.setOnAction(e -> stage.close());
-        Button save = new Button("SAVE");
+        Button save = new Button("Save");
         save.getStyleClass().addAll("primary-button", "accent");
         save.setDefaultButton(true);
         save.setOnAction(e -> save());
@@ -353,6 +355,7 @@ public final class EmulatorSettingsDialog {
     private static void addRow(GridPane grid, int row, String label, Control field) {
         Label l = new Label(label);
         l.getStyleClass().add("field-label");
+        l.setLabelFor(field);
         field.setMaxWidth(Double.MAX_VALUE);
         grid.add(l, 0, row);
         grid.add(field, 1, row);

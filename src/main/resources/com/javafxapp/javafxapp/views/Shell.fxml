@@ -16,13 +16,13 @@
             <ImageView fx:id="logo" fitWidth="124.0" preserveRatio="true">
                 <Image url="@../images/logo.png"/>
             </ImageView>
-            <Button fx:id="navHome" styleClass="sidebar-button, nav-button" text="HOME"/>
-            <Button fx:id="navLibrary" styleClass="sidebar-button, nav-button" text="LIBRARY"/>
-            <Button fx:id="navHistory" styleClass="sidebar-button, nav-button" text="HISTORY"/>
-            <Button fx:id="navSettings" styleClass="sidebar-button, nav-button" text="SETTINGS"/>
+            <Button fx:id="navHome" styleClass="sidebar-button, nav-button" text="Home"/>
+            <Button fx:id="navLibrary" styleClass="sidebar-button, nav-button" text="Library"/>
+            <Button fx:id="navHistory" styleClass="sidebar-button, nav-button" text="History"/>
+            <Button fx:id="navSettings" styleClass="sidebar-button, nav-button" text="Settings"/>
             <Region VBox.vgrow="ALWAYS"/>
-            <Button fx:id="themeToggle" styleClass="theme-toggle" focusTraversable="false"/>
-            <Button fx:id="contactButton" maxWidth="Infinity" styleClass="link-button" text="frxctura" focusTraversable="false">
+            <Button fx:id="themeToggle" styleClass="theme-toggle" mnemonicParsing="false"/>
+            <Button fx:id="contactButton" maxWidth="Infinity" styleClass="link-button" text="frxctura" mnemonicParsing="false">
                 <graphic><Region styleClass="github-icon"/></graphic>
             </Button>
         </VBox>
@@ -41,7 +41,7 @@
             <Region fx:id="activityDot" styleClass="activity-dot" visible="false" managed="false"/>
             <Label fx:id="statusLabel" styleClass="status-text"/>
             <Region HBox.hgrow="ALWAYS"/>
-            <Label styleClass="status-version" text="Ctrl+O open  ·  Ctrl+Enter start  ·  Esc back/cancel"/>
+            <Label styleClass="status-version" text="Ctrl+O open  ·  Ctrl+Enter patch  ·  Esc back/cancel"/>
         </HBox>
     </bottom>
 </BorderPane>

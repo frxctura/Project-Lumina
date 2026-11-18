@@ -3,24 +3,43 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<ScrollPane fitToWidth="true" hbarPolicy="NEVER" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
-            fx:controller="com.javafxapp.javafxapp.ui.pages.SettingsController">
+<HBox xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1"
+      fx:controller="com.javafxapp.javafxapp.ui.pages.SettingsController">
+  <!-- a list of the sections on the left that jumps to each one -->
+  <VBox fx:id="settingsNav" styleClass="settings-nav"/>
+  <ScrollPane fx:id="settingsScroll" fitToWidth="true" hbarPolicy="NEVER" HBox.hgrow="ALWAYS">
     <VBox fx:id="settingsContainer" styleClass="page">
         <Label styleClass="title" text="Settings"/>
 
-        <VBox styleClass="card">
+        <VBox fx:id="appearanceCard" styleClass="card">
             <Label styleClass="section-label" text="APPEARANCE"/>
-            <HBox styleClass="toolbar">
-                <HBox styleClass="segmented">
-                    <ToggleButton fx:id="themeDark" styleClass="segment, first" text="DARK"/>
-                    <ToggleButton fx:id="themeLight" styleClass="segment" text="LIGHT"/>
-                    <ToggleButton fx:id="themeSystem" styleClass="segment, last" text="SYSTEM"/>
+            <GridPane styleClass="form-grid">
+                <columnConstraints>
+                    <ColumnConstraints minWidth="96.0"/>
+                    <ColumnConstraints hgrow="ALWAYS"/>
+                </columnConstraints>
+                <Label fx:id="themeLabel" styleClass="field-label" text="Theme" GridPane.rowIndex="0"/>
+                <HBox styleClass="toolbar" GridPane.rowIndex="0" GridPane.columnIndex="1">
+                    <HBox styleClass="segmented">
+                        <ToggleButton fx:id="themeDark" styleClass="segment, first" text="Dark"/>
+                        <ToggleButton fx:id="themeLight" styleClass="segment" text="Light"/>
+                        <ToggleButton fx:id="themeSystem" styleClass="segment, last" text="Follow Windows"/>
+                    </HBox>
+                    <Label fx:id="themeHint" styleClass="path-label"/>
                 </HBox>
-                <Label fx:id="themeHint" styleClass="path-label"/>
-            </HBox>
+                <Label fx:id="motionLabel" styleClass="field-label" text="Animations" GridPane.rowIndex="1"/>
+                <HBox styleClass="toolbar" GridPane.rowIndex="1" GridPane.columnIndex="1">
+                    <HBox styleClass="segmented">
+                        <ToggleButton fx:id="motionSystem" styleClass="segment, first" text="Follow Windows"/>
+                        <ToggleButton fx:id="motionFull" styleClass="segment" text="On"/>
+                        <ToggleButton fx:id="motionReduced" styleClass="segment, last" text="Reduced"/>
+                    </HBox>
+                    <Label fx:id="motionHint" styleClass="path-label"/>
+                </HBox>
+            </GridPane>
         </VBox>
 
-        <VBox styleClass="card">
+        <VBox fx:id="backupCard" styleClass="card">
             <VBox styleClass="stack">
                 <Label styleClass="section-label" text="BACKUP &amp; MOVE"/>
                 <Label styleClass="path-label" wrapText="true" minHeight="-Infinity"
@@ -34,15 +53,15 @@
                 <CheckBox fx:id="backupGameDirCheckbox" styleClass="app-check"
                           text="Copy entire game folder first" GridPane.rowIndex="0"/>
                 <HBox styleClass="toolbar" GridPane.rowIndex="0" GridPane.columnIndex="1">
-                    <Button fx:id="selectBackupDir" styleClass="secondary-button" text="BROWSE"/>
-                    <Button fx:id="openBackupDir" styleClass="secondary-button" text="OPEN"/>
+                    <Button fx:id="selectBackupDir" styleClass="secondary-button" text="Browse…"/>
+                    <Button fx:id="openBackupDir" styleClass="secondary-button" text="Open"/>
                     <Label fx:id="backupDirLabel" styleClass="path-label" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
                 </HBox>
                 <CheckBox fx:id="moveGameDirCheckbox" styleClass="app-check"
                           text="Move game folder afterwards" GridPane.rowIndex="1"/>
                 <HBox styleClass="toolbar" GridPane.rowIndex="1" GridPane.columnIndex="1">
-                    <Button fx:id="selectMoveDir" styleClass="secondary-button" text="BROWSE"/>
-                    <Button fx:id="openMoveDir" styleClass="secondary-button" text="OPEN"/>
+                    <Button fx:id="selectMoveDir" styleClass="secondary-button" text="Browse…"/>
+                    <Button fx:id="openMoveDir" styleClass="secondary-button" text="Open"/>
                     <Label fx:id="moveDirLabel" styleClass="path-label" maxWidth="Infinity" HBox.hgrow="ALWAYS"/>
                 </HBox>
             </GridPane>
@@ -50,17 +69,17 @@
                       text="Show what will change before patching"/>
         </VBox>
 
-        <VBox styleClass="card">
+        <VBox fx:id="emulatorsCard" styleClass="card">
             <Label styleClass="section-label" text="EMULATORS"/>
             <VBox fx:id="emulatorList" styleClass="gap-2"/>
             <HBox styleClass="toolbar">
-                <Button fx:id="excludeEmulatorsButton" styleClass="secondary-button" text="EXCLUDE FROM DEFENDER"/>
+                <Button fx:id="excludeEmulatorsButton" styleClass="secondary-button" text="Exclude from Defender"/>
                 <Label styleClass="path-label" wrapText="true" HBox.hgrow="ALWAYS" maxWidth="Infinity"
                        text="Stops Microsoft Defender from quarantining the emulator DLLs and Steamless that Lumina keeps. Needs administrator permission."/>
             </HBox>
         </VBox>
 
-        <VBox styleClass="card">
+        <VBox fx:id="drmCard" styleClass="card">
             <VBox styleClass="stack">
                 <Label styleClass="section-label" text="DRM UNPACKING"/>
                 <Label styleClass="path-label" wrapText="true" minHeight="-Infinity"
@@ -71,26 +90,28 @@
             <VBox fx:id="toolList" styleClass="gap-2"/>
         </VBox>
 
-        <VBox styleClass="card">
+        <VBox fx:id="dataCard" styleClass="card">
             <Label styleClass="section-label" text="APP DATA &amp; LOGGING"/>
             <HBox styleClass="toolbar">
                 <Label styleClass="field-label" text="Stored in"/>
                 <Label fx:id="appDataLabel" styleClass="path-label"/>
-                <Button fx:id="openAppData" styleClass="secondary-button" text="OPEN"/>
+                <Button fx:id="openAppData" styleClass="secondary-button" text="Open"/>
             </HBox>
             <HBox styleClass="gap-4" alignment="CENTER_LEFT">
                 <CheckBox fx:id="logToFileCheckbox" styleClass="app-check" text="Write activity to a log file"/>
                 <HBox styleClass="toolbar">
-                    <Button fx:id="openLogsButton" styleClass="secondary-button" text="OPEN LOGS"/>
-                    <Button fx:id="clearRecentButton" styleClass="secondary-button" text="CLEAR RECENT GAMES"/>
-                    <Button fx:id="copyDiagnosticsButton" styleClass="secondary-button" text="COPY DIAGNOSTICS"/>
+                    <Button fx:id="openLogsButton" styleClass="secondary-button" text="Open logs"/>
+                    <Button fx:id="clearRecentButton" styleClass="secondary-button" text="Clear recent games"/>
+                    <Button fx:id="copyDiagnosticsButton" styleClass="secondary-button" text="Copy diagnostics"/>
                 </HBox>
             </HBox>
+            <Separator/>
+            <HBox styleClass="toolbar">
+                <Label styleClass="path-label" wrapText="true" HBox.hgrow="ALWAYS" maxWidth="Infinity"
+                       text="Puts every setting on this page back to its default. Your history and backups aren't touched."/>
+                <Button fx:id="resetSettings" styleClass="secondary-button, danger-text" text="Reset all settings…" minWidth="-Infinity"/>
+            </HBox>
         </VBox>
-
-        <HBox styleClass="toolbar">
-            <Region HBox.hgrow="ALWAYS"/>
-            <Button fx:id="resetSettings" styleClass="secondary-button, danger-text" text="RESET SETTINGS"/>
-        </HBox>
     </VBox>
-</ScrollPane>
+  </ScrollPane>
+</HBox>

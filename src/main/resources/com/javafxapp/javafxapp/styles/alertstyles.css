@@ -43,8 +43,8 @@
     -fx-text-fill: -text;
     -fx-min-height: 36; -fx-pref-height: 36;
     -fx-padding: 0 16;
-    -fx-font-size: 12px;
-    -fx-font-family: "Nunito Black";
+    -fx-font-size: 14px;
+    -fx-font-family: "Nunito SemiBold";
     -fx-background-radius: 6;
     -fx-background-insets: 0;
     -fx-cursor: hand;
@@ -53,6 +53,6 @@
 .lumina-alert .button:pressed { -fx-background-color: -control-pressed; }
 .lumina-alert .button:default { -fx-background-color: -accent; -fx-text-fill: -on-accent; }
 .lumina-alert .button:default:hover { -fx-background-color: -accent-hover; }
-.lumina-alert .button:default.destructive       { -fx-background-color: -danger-fill; -fx-text-fill: white; }
+.lumina-alert .button:default.destructive       { -fx-background-color: -danger-fill; -fx-text-fill: -on-accent; }
 .lumina-alert .button:default.destructive:hover { -fx-background-color: -danger-fill-hover; }
 .lumina-alert .button:disabled { -fx-opacity: 0.4; }

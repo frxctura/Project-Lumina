@@ -29,6 +29,7 @@ public final class AppSettings {
     private static final String DEFENDER_ASKED = "defenderAsked";
     private static final String THEME = "theme";
     private static final String MOTION = "motion";
+    private static final String ACCENT = "accentColor";
     private static final String WINDOW_X = "windowX";
     private static final String WINDOW_Y = "windowY";
     private static final String WINDOW_WIDTH = "windowWidth";
@@ -132,6 +133,10 @@ public final class AppSettings {
 
     public static void setTheme(Theme theme) { PREFS.put(THEME, theme.name()); }
 
+    /** Custom accent color as #rrggbb, or empty for the built-in purple. */
+    public static String getAccent()             { return PREFS.get(ACCENT, ""); }
+    public static void setAccent(String hex)      { if (hex == null || hex.isBlank()) PREFS.remove(ACCENT); else PREFS.put(ACCENT, hex); }
+
     /** Animations: follow Windows (Settings, Accessibility, Visual effects), always on, or reduced. */
     public enum Motion { SYSTEM, FULL, REDUCED }
 
@@ -183,6 +188,7 @@ public final class AppSettings {
         setUnpackDrm(false);
         setEmulator(Emulator.GOLDBERG);
         setMotion(Motion.SYSTEM);
+        setAccent("");
         PREFS.remove(DEFENDER_ASKED);
     }
 

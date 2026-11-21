@@ -11,6 +11,7 @@ import com.javafxapp.javafxapp.safety.DefenderExclusion;
 import com.javafxapp.javafxapp.emulator.Emulator;
 import com.javafxapp.javafxapp.emulator.EmulatorInstaller;
 import com.javafxapp.javafxapp.unpack.Steamless;
+import com.javafxapp.javafxapp.ui.components.AccentPicker;
 import com.javafxapp.javafxapp.ui.components.Toaster;
 import com.javafxapp.javafxapp.ui.shell.AppShell;
 import com.javafxapp.javafxapp.ui.shell.Page;
@@ -34,6 +35,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.stage.DirectoryChooser;
 
 import java.io.File;
@@ -66,6 +68,10 @@ public class SettingsController implements Page {
     @FXML private ToggleButton themeDark, themeLight, themeSystem;
     @FXML private Label themeHint, motionHint, themeLabel, motionLabel;
     @FXML private ToggleButton motionSystem, motionFull, motionReduced;
+    @FXML private Label accentLabel;
+    @FXML private HBox accentHost;
+    private AccentPicker accentPicker;
+    @FXML private Button accentReset;
     @FXML private VBox settingsNav, appearanceCard, backupCard, emulatorsCard, drmCard, dataCard;
     @FXML private ScrollPane settingsScroll;
     private final Map<VBox, Button> sectionButtons = new LinkedHashMap<>();
@@ -76,6 +82,7 @@ public class SettingsController implements Page {
     public void initialize() {
         setUpThemeToggle();
         setUpMotionToggle();
+        setUpAccentPicker();
         setUpSectionList();
         themeLabel.setLabelFor(themeDark);
         motionLabel.setLabelFor(motionSystem);
@@ -120,6 +127,8 @@ public class SettingsController implements Page {
                     .ask()) return;
             AppSettings.reset();
             Theme.choose(AppSettings.Theme.DARK, settingsContainer.getScene());
+            Theme.apply(settingsContainer.getScene());
+            syncAccent();
             refresh();
             shell.toast(Toaster.Kind.INFO, "Settings reset to defaults.");
         });
@@ -254,6 +263,26 @@ public class SettingsController implements Page {
                 sync.run();
             }
         });
+    }
+
+    private void setUpAccentPicker() {
+        accentPicker = new AccentPicker(color -> {
+            Theme.chooseAccent(color.equals(AccentPicker.DEFAULT) ? null : color, settingsContainer.getScene());
+            accentReset.setDisable(Theme.accent() == null);
+        });
+        accentHost.getChildren().add(accentPicker);
+        accentLabel.setLabelFor(accentPicker);
+        syncAccent();
+        accentReset.setOnAction(e -> {
+            Theme.chooseAccent(null, settingsContainer.getScene());
+            syncAccent();
+        });
+    }
+
+    private void syncAccent() {
+        Color saved = Theme.accent();
+        accentPicker.setValue(saved == null ? AccentPicker.DEFAULT : saved);
+        accentReset.setDisable(saved == null);
     }
 
     private void setUpThemeToggle() {

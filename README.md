@@ -28,7 +28,7 @@ Point it at a game folder, or pick a game from your Steam library, and hit start
 
 ## Getting started
 
-1. Grab `LuminaSetup-1.6.exe` from the [latest release](../../releases/latest) and run it.
+1. Grab `LuminaSetup-1.6.1.exe` from the [latest release](../../releases/latest) and run it.
 2. Open Lumina and pick a game.
 3. Hit Patch game. The first time, it downloads the emulator itself, so there's nothing to set up.
 

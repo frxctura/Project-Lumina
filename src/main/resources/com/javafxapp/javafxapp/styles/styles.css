@@ -558,3 +558,67 @@
 /* ---- settings section list ---- */
 .settings-nav { -fx-padding: 24 0 24 24; -fx-spacing: 4; -fx-min-width: 176; -fx-pref-width: 176; }
 .settings-nav .nav-button { -fx-font-size: 13px; -fx-min-height: 34; -fx-pref-height: 34; }
+
+/* accent color swatches (Settings, Appearance) */
+.accent-swatches { -fx-spacing: 8; }
+.accent-swatch {
+    -fx-background-color: transparent;
+    -fx-background-radius: 999;
+    -fx-border-color: transparent;
+    -fx-border-width: 2;
+    -fx-border-radius: 999;
+    -fx-padding: 2;
+    -fx-cursor: hand;
+}
+.accent-swatch:hover { -fx-border-color: -border-strong; }
+.accent-swatch:selected { -fx-border-color: -text; }
+.accent-swatch:focused { -fx-border-color: -focus-ring; }
+.accent-swatch-fill {
+    -fx-min-width: 22; -fx-min-height: 22; -fx-pref-width: 22; -fx-pref-height: 22; -fx-max-width: 22; -fx-max-height: 22;
+    -fx-background-radius: 999;
+}
+.accent-custom .accent-swatch-fill {
+    -fx-background-color: linear-gradient(to bottom right, #e5484d, #e0a020, #22a35a, #14b8c4, #3b82f6, #7859f7, #e04da0);
+}
+
+.accent-popover {
+    -fx-background-color: -popup;
+    -fx-background-radius: 10;
+    -fx-border-color: -border-strong;
+    -fx-border-radius: 10;
+    -fx-padding: 14;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 18, 0, 0, 6);
+}
+.accent-preview {
+    -fx-min-width: 36; -fx-min-height: 36; -fx-pref-width: 36; -fx-pref-height: 36;
+    -fx-background-radius: 8;
+}
+.accent-hex {
+    -fx-background-color: -surface-3;
+    -fx-text-fill: -text;
+    -fx-background-radius: 6;
+    -fx-border-color: -border;
+    -fx-border-radius: 6;
+    -fx-font-family: "Consolas";
+    -fx-highlight-fill: -accent;
+    -fx-highlight-text-fill: -on-accent;
+}
+.accent-hex:focused { -fx-border-color: -focus-ring; }
+.accent-grid { -fx-hgap: 12; -fx-vgap: 10; -fx-alignment: center-left; }
+.accent-slider { -track-start: #808080; -track-end: #ffffff; }
+.accent-slider .track {
+    -fx-background-color: linear-gradient(to right, -track-start, -track-end);
+    -fx-background-radius: 4;
+    -fx-padding: 4;
+    -fx-background-insets: 0;
+}
+.accent-slider .thumb {
+    -fx-background-color: #ffffff;
+    -fx-background-radius: 8;
+    -fx-border-color: rgba(0, 0, 0, 0.35);
+    -fx-border-radius: 8;
+    -fx-padding: 7;
+}
+.accent-slider.hue-slider .track {
+    -fx-background-color: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+}

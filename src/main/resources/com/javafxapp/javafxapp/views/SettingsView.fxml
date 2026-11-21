@@ -36,6 +36,11 @@
                     </HBox>
                     <Label fx:id="motionHint" styleClass="path-label"/>
                 </HBox>
+                <Label fx:id="accentLabel" styleClass="field-label" text="Accent color" GridPane.rowIndex="2"/>
+                <HBox styleClass="toolbar" GridPane.rowIndex="2" GridPane.columnIndex="1">
+                    <HBox fx:id="accentHost"/>
+                    <Button fx:id="accentReset" styleClass="secondary-button" text="Default"/>
+                </HBox>
             </GridPane>
         </VBox>
 

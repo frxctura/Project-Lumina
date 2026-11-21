@@ -13,6 +13,7 @@ import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.Pane;
+import javafx.scene.paint.Color;
 import javafx.util.Duration;
 
 import java.io.IOException;
@@ -65,6 +66,56 @@ public final class Theme {
     public static void apply(Node root) {
         root.getStyleClass().remove(LIGHT_CLASS);
         if (isLight()) root.getStyleClass().add(LIGHT_CLASS);
+        root.setStyle(accentStyle());
+    }
+
+    /** Sets (or with null, clears) the custom accent color and restyles the scene right away. */
+    public static void chooseAccent(Color color, Scene scene) {
+        AppSettings.setAccent(color == null ? "" : hex(color));
+        if (scene != null) apply(scene);
+    }
+
+    /** The saved custom accent, or null when the built-in purple is in use. */
+    public static Color accent() {
+        String saved = AppSettings.getAccent();
+        if (saved.isBlank()) return null;
+        try {
+            return Color.web(saved);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    // overrides the accent tokens from styles.css; inline styles beat the stylesheet's .app-root rules
+    private static String accentStyle() {
+        Color c = accent();
+        if (c == null) return "";
+        boolean light = isLight();
+        Color hover = c.deriveColor(0, 1, 0.88, 1);
+        // readable on the page background: lighter on dark themes, darker on light ones
+        Color text = light ? c.interpolate(Color.BLACK, 0.25) : c.interpolate(Color.WHITE, 0.45);
+        Color onAccent = luminance(c) > 0.45 ? Color.web("#111111") : Color.WHITE;
+        return "-accent: " + hex(c) + "; -accent-hover: " + hex(hover) + "; -accent-text: " + hex(text)
+                + "; -on-accent: " + hex(onAccent)
+                + "; -accent-tint: " + rgba(c, light ? 0.14 : 0.18)
+                + "; -accent-tint-faint: " + rgba(c, light ? 0.06 : 0.08) + ";";
+    }
+
+    private static double luminance(Color c) {
+        return 0.2126 * channel(c.getRed()) + 0.7152 * channel(c.getGreen()) + 0.0722 * channel(c.getBlue());
+    }
+
+    private static double channel(double v) {
+        return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    }
+
+    private static String hex(Color c) {
+        return String.format("#%02x%02x%02x", Math.round(c.getRed() * 255), Math.round(c.getGreen() * 255), Math.round(c.getBlue() * 255));
+    }
+
+    private static String rgba(Color c, double alpha) {
+        return String.format(java.util.Locale.ROOT, "rgba(%d, %d, %d, %.2f)",
+                Math.round(c.getRed() * 255), Math.round(c.getGreen() * 255), Math.round(c.getBlue() * 255), alpha);
     }
 
     public static void apply(Scene scene) {
